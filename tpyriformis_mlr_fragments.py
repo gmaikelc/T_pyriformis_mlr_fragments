@@ -756,8 +756,11 @@ def generate_molecule_image(smiles, highlight_mol, color=(1, 0, 0), mol_size=(30
         
         drawer.DrawMolecule(mol, highlightAtoms=highlight_atoms, highlightAtomColors=highlight_colors)
         drawer.FinishDrawing()
-        img = drawer.GetImage()
-        return Image.open(img)
+        
+        # Convert the drawing to PNG format and load it into an Image object
+        png_data = drawer.GetDrawingText()
+        img = Image.open(io.BytesIO(png_data))
+        return img
 
 #%% RUN
 
@@ -858,9 +861,9 @@ else:
 
         # Display the top molecule with each SMARTS highlighted in separate images
         #st.markdown("<h2 style='text-align: center; font-size: 20px;'>Molecule with Highlighted Substructures)</h2>", unsafe_allow_html=True)
-        im = Draw.MolToImage(Chem.MolFromSmiles('CCCC(C)CC1=CC=C(CCC)C(CCC)=C1'),fitImage=True)
-        st.image(im)
-
+        #im = Draw.MolToImage(Chem.MolFromSmiles('CCCC(C)CC1=CC=C(CCC)C(CCC)=C1'),fitImage=True)
+        #st.image(im)
+        
         # Iterate over the first 5 rows of the dataframe
         for index, row in data.head(5).iterrows():
             molecule_id = row.iloc[0]  # Assuming molecule ID is in the first column
@@ -874,9 +877,11 @@ else:
                 img = generate_molecule_image(smiles, highlight_mol, color=colors[i])
                 
                 if img:
-                    st.image(img, caption=f'Molecule ID: {molecule_id} - Highlight: {smarts_name}', use_column_width=True)
+                  # Directly display the RDKit-generated image
+                    display(img)
+                    print(f'Molecule ID: {molecule_id} - Highlight: {smarts_name}')
                 else:
-                    st.write(f"Could not generate image for Molecule ID: {molecule_id} - SMARTS: {smarts_name}")
+                    print(f"Could not generate image for Molecule ID: {molecule_id} - SMARTS: {smarts_name}")
                 
         
        
