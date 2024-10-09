@@ -79,8 +79,6 @@ def img_to_bytes(img_path):
 image = Image.open('cropped-header.png')
 st.image(image)
 
-
-
 #st.title(':computer: t pyriformis ecotoxicity fragments')
 #with st.expander("<span style='color: blue;'>More information</span>", expanded=True):
 with st.expander("More information",):
@@ -112,8 +110,6 @@ st.sidebar.markdown("""
 """)
 
 uploaded_file_1 = st.sidebar.file_uploader("Upload a CSV file with SMILES and fractions", type=["csv"])
-
-
 
 
 #%% Standarization by MOLVS ####
@@ -541,8 +537,6 @@ def get_color(confidence):
         return 'red'
 
 
-
-
 #%% Predictions        
 
 def predictions(loaded_model, loaded_desc, df_test_normalized):
@@ -551,7 +545,6 @@ def predictions(loaded_model, loaded_desc, df_test_normalized):
     std_resd = []
     idx = data['ID']
     
-
     descriptors_model = loaded_desc
     # Placeholder for the spinner
     with st.spinner('CALCULATING PREDICTIONS (STEP 2 OF 3)...'):
@@ -585,8 +578,7 @@ def predictions(loaded_model, loaded_desc, df_test_normalized):
     
         dataframe_std = pd.DataFrame(std_resd).T
         dataframe_std.index = idx
-          
-        
+                
         h_final = pd.DataFrame(h_values).T
         h_final.index = idx
         h_final.rename(columns={0: "Confidence"},inplace=True)
@@ -608,14 +600,10 @@ def predictions(loaded_model, loaded_desc, df_test_normalized):
         final_file.loc[(final_file["Confidence"] == False) & ((final_file["Std_residual"] == 'Outside AD')), 'Confidence'] = 'LOW'
         final_file.loc[(final_file["Confidence"] == False) & ((final_file["Std_residual"] == 'Inside AD')), 'Confidence'] = 'MEDIUM'
 
-
-            
         df_no_duplicates = final_file[~final_file.index.duplicated(keep='first')]
         styled_df = df_no_duplicates.style.apply(lambda row: [f"background-color: {get_color(row['Confidence'])}" for _ in row],subset=["Confidence"], axis=1)
     
         return final_file, styled_df,leverage_train,std_residual_train, leverage_test, std_residual_test
-
-
 
 
 #Calculating the William's plot limits
@@ -664,9 +652,6 @@ def calculate_wp_plot_limits(leverage_train,std_residual_train, x_std_max=4, x_s
         #st.write('x_lim_max_lev:', x_lim_max_lev)
 
         return x_lim_max_std, x_lim_min_std, h_critical, x_lim_max_lev, x_lim_min_lev
-
-
-
 
 import pandas as pd
 import plotly.express as px
@@ -754,10 +739,6 @@ def filedownload1(df):
     href = f'<a href="data:file/csv;base64,{b64}" download="ml_toxicity_t_pyriformis_pLC50_results.csv">Download CSV File with results</a>'
     return href
 
-
-
-
-
 #%% RUN
 
 data_train = pd.read_csv("data/" + "data_Tpyriformis_22var_original_training.csv")
@@ -766,10 +747,7 @@ loaded_model = pickle.load(open("models/" + "ml_model_tetrahymena_pyriformis_str
 loaded_desc = pickle.load(open("models/" + "ml_descriptor_tetrahymena_pyriformis_structural.pickle", 'rb'))
 
 
-
-
-
-#Uploaded file calculation
+#Uploaded file calculation ####
 if uploaded_file_1 is not None:
     run = st.button("RUN the Model")
     if run == True:
@@ -787,18 +765,14 @@ if uploaded_file_1 is not None:
         X_final2= test_data1
         
         df_train_normalized, df_test_normalized = normalize_data(train_data, X_final2)
-      
-        
-        #st.markdown(filedownload5(df_test_normalized), unsafe_allow_html=True)
         
         final_file, styled_df,leverage_train,std_residual_train, leverage_test, std_residual_test= predictions(loaded_model, loaded_desc, df_test_normalized)
-       
         
         x_lim_max_std, x_lim_min_std, h_critical, x_lim_max_lev, x_lim_min_lev = calculate_wp_plot_limits(leverage_train,std_residual_train, x_std_max=4, x_std_min=-4)
        
         figure  = williams_plot(leverage_train, leverage_test, std_residual_train, std_residual_test,id_list_1)
          
-        col1,col2 = st.columns(2)
+        col1, col2 = st.columns(2)
 
         with col1:
             st.header("Tetrahymena pyriformis",divider='blue')
@@ -839,21 +813,20 @@ else:
     
         col1, col2 = st.columns(2)
 
+        col1, col2 = st.columns(2)
+
         with col1:
-            st.header("T. pyriformis",divider='blue')
+            st.header("Tetrahymena pyriformis",divider='blue')
             st.subheader(r'Predictions')
             st.write(styled_df)
         with col2:
             st.markdown("<h2 style='text-align: center; font-size: 30px;'>William's Plot (Applicability Domain)</h2>", unsafe_allow_html=True)
             st.plotly_chart(figure,use_container_width=True)
-        st.markdown(":point_down: **Here you can download the results for T. pyriformis model**", unsafe_allow_html=True,)
+        st.markdown(":point_down: **Here you can download the results for T. pyriformis MLR model**", unsafe_allow_html=True,)
         st.markdown(filedownload1(final_file), unsafe_allow_html=True)
 
-
-
-
         
-
+## From Drawn Structure ##########################
 on2 = st.toggle('Use drawn structure',key="13")
 with st.expander("SMILES editor"):
     drawer = st_ketcher(key="12")
