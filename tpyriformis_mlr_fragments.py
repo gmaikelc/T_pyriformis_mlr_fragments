@@ -842,7 +842,7 @@ else:
         with col1:
             st.header("T. pyriformis",divider='blue')
             st.subheader(r'Predictions')
-            st.write(styled_df
+            st.write(styled_df)
         with col2:
             st.markdown("<h2 style='text-align: center; font-size: 30px;'>William's Plot (Applicability Domain)</h2>", unsafe_allow_html=True)
             st.plotly_chart(figure,use_container_width=True)
