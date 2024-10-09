@@ -1,4 +1,4 @@
-# Chemical Substructures in a Explainable Machine Learning Model to identify the ecotoxicity risks factors in T. pyriformis
+# Chemical Substructures in an Explainable Machine Learning Model to identify the ecotoxicity risks factors in T. pyriformis
 
 Author: Gerardo M Casanola-Martin & Karel Dieguez-Santana
 
