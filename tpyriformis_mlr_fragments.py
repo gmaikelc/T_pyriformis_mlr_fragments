@@ -837,7 +837,7 @@ else:
         
         figure  = williams_plot(leverage_train, leverage_test, std_residual_train, std_residual_test,id_list_1)
     
-        col1,col2 = st.columns(2)
+        col1, col2 = st.columns(2)
 
         with col1:
             st.header("T. pyriformis",divider='blue')
