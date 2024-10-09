@@ -39,6 +39,8 @@ import streamlit as st
 from PIL import Image
 import io
 import base64
+from rdkit.Chem import Draw, rdDepictor
+from rdkit.Chem.Draw import rdMolDraw2D
 
 from rdkit import Chem, RDConfig
 from rdkit.Chem import AllChem, rdFingerprintGenerator, Descriptors, Draw
