@@ -199,7 +199,6 @@ def calc_descriptors(data, smiles_col_pos):
 
     # Placeholder for the spinner
     with st.spinner('CALCULATING DESCRIPTORS (STEP 1 OF 3)...'):
-        # Simulate a long-running computation
         time.sleep(1)  # Sleep for 5 seconds to mimic computation
         # Loop through each molecule in the dataset
   
