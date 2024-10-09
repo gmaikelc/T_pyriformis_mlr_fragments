@@ -1,4 +1,4 @@
-# T_pyriformis_mlr_fragments
+# Chemical Substructures in a Explainable Machine Learning Model to identify the ecotoxicity risks factors in T. pyriformis
 
 Author: Gerardo M Casanola-Martin & Karel Dieguez-Santana
 
