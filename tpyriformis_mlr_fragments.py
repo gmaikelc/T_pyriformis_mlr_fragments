@@ -859,7 +859,7 @@ else:
         st.markdown(filedownload1(final_file), unsafe_allow_html=True)
 
         # Display the top molecule with each SMARTS highlighted in separate images
-        st.markdown("<h2 style='text-align: center; font-size: 20px;'>"Molecule with Highlighted Substructures")</h2>", unsafe_allow_html=True)
+        st.markdown("<h2 style='text-align: center; font-size: 20px;'>Molecule with Highlighted Substructures)</h2>", unsafe_allow_html=True)
 
         # Iterate over the first 5 rows of the dataframe
         for index, row in data.head(5).iterrows():
