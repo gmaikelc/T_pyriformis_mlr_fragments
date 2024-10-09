@@ -193,7 +193,8 @@ def formal_charge_calculation(descriptors):
     descriptors["Formal_charge"] = charges
     return descriptors
 
-def fragment_descriptors(data, smiles_col_pos):
+def calc_descriptors(data, smiles_col_pos):
+     smiles_list = []
      t = st.empty()
 
     # Placeholder for the spinner
@@ -262,6 +263,11 @@ def fragment_descriptors(data, smiles_col_pos):
     
                 mol = Chem.MolFromSmiles(molecule_smiles)  # Convert SMILES to RDKit Mol object
                 if mol is not None:
+                    smiles_ionized =  molecule_smiles #charges_ph(molecule_smiles, 7.4)
+                    smile_checked = smiles_ionized #smile_obabel_corrector(smiles_ionized)
+                    #smile_checked = smiles_ionized
+                    smile_final = smile_checked.rstrip()
+                    smiles_list.append(smile_final)
                     # Define substructure match logic for each pattern
                     fragment3 = mol.HasSubstructMatch(smarts_pattern3)
                     fragment9_1 = mol.HasSubstructMatch(smarts_pattern9_1)
@@ -336,7 +342,7 @@ def fragment_descriptors(data, smiles_col_pos):
     
                     
         
-                            # Count the occurrences of smarts_pattern4 in the molecule
+                    # Count the occurrences of smarts_pattern4 in the molecule
                     count_in_molecule1 = len(mol.GetSubstructMatches(smarts_pattern1))
                     count_in_molecule2 = len(mol.GetSubstructMatches(smarts_pattern2))
             
@@ -409,8 +415,8 @@ def fragment_descriptors(data, smiles_col_pos):
     
     
             # Create a DataFrame to store the results
-        df_fragments = pd.DataFrame({
-            
+        descriptors_total = pd.DataFrame({
+            'NAME': molecule_name,
             'Cl-C': molecule_counts1, 
             '(C=C),(C-C),(C-C),xC': molecule_counts2,
             'O=C-C-O': results3,
@@ -436,13 +442,7 @@ def fragment_descriptors(data, smiles_col_pos):
             
         })
     
-        
-    
-        return df_fragments, smiles_list
-
-
         return descriptors_total, smiles_list
-
 
 
 def reading_reorder(data, loaded_desc):
@@ -470,26 +470,16 @@ def reading_reorder(data, loaded_desc):
 ### ----------------------- ###
 
 def normalize_data(train_data, test_data):
-    # Normalize the training data
-    df_train = pd.DataFrame(train_data)
-    saved_cols = df_train.columns
-    min_max_scaler = preprocessing.MinMaxScaler().fit(df_train)
-    np_train_scaled = min_max_scaler.transform(df_train)
-    df_train_normalized = pd.DataFrame(np_train_scaled, columns=saved_cols)
-
-    # Normalize the test data using the scaler fitted on training data
-    np_test_scaled = min_max_scaler.transform(test_data)
-    df_test_normalized = pd.DataFrame(np_test_scaled, columns=saved_cols)
+    df_train_normalized = pd.DataFrame(train_data)
+    df_test_normalized = pd.DataFrame(test_data)
 
     return df_train_normalized, df_test_normalized
-
-
 
 
 #%% Determining Applicability Domain (AD)
 
 def applicability_domain(x_test_normalized, x_train_normalized):
-    y_train=data_train['pLC50_sw']
+    y_train=data_train['pLC50']
     X_train = x_train_normalized.values
     X_test = x_test_normalized.values
     # Calculate leverage and standard deviation for the training set
@@ -761,7 +751,7 @@ def williams_plot(leverage_train, leverage_test, std_residual_train, std_residua
 def filedownload1(df):
     csv = df.to_csv(index=True,header=True)
     b64 = base64.b64encode(csv.encode()).decode()  # strings <-> bytes conversions
-    href = f'<a href="data:file/csv;base64,{b64}" download="ml_toxicity_rotifer_pLC50_results_saltwater.csv">Download CSV File with results</a>'
+    href = f'<a href="data:file/csv;base64,{b64}" download="ml_toxicity_t_pyriformis_pLC50_results.csv">Download CSV File with results</a>'
     return href
 
 
@@ -789,8 +779,8 @@ if uploaded_file_1 is not None:
         
         # Calculate descriptors and SMILES for the first data
         descriptors_total_1, smiles_list_1 = calc_descriptors(data, 1)
-             
-                 
+            
+        #df_fragments         
         #Selecting the descriptors based on model for salt water component
         test_data1, id_list_1 =  reading_reorder(descriptors_total_1,loaded_desc)
         
