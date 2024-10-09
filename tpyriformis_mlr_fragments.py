@@ -194,63 +194,64 @@ def formal_charge_calculation(descriptors):
     return descriptors
 
 def calc_descriptors(data, smiles_col_pos):
-     smiles_list = []
-     t = st.empty()
+    
+    # Create empty lists to store the results
+    results3 = []
+    results12 = []
+    results13 = []
+    results17 = []
+    results18 = []
+    molecule_counts1 = []
+    molecule_counts2 = []
+    molecule_counts4 = []
+    molecule_counts5 = []
+    molecule_counts6 = []
+    molecule_counts7 = []
+    molecule_counts8 = []
+    molecule_counts9 = []
+    molecule_counts10 = []
+    molecule_counts11 = []
+    molecule_counts14 = []
+    molecule_counts15 = []
+    molecule_counts16 = []
+    molecule_counts19 = []
+    molecule_counts20 = []
+    molecule_counts21 = []
+    molecule_counts22 = []
+    
+    # Define SMARTS patterns
+    smarts_pattern1 = Chem.MolFromSmarts('[Cl]-[*]')  #OKK
+    smarts_pattern2 = Chem.MolFromSmarts('[c;X3](c)(c)-[CH3]')  #OK
+    smarts_pattern3 = Chem.MolFromSmarts('[O]=C-[C]-O')  #OK
+    smarts_pattern4_1 = Chem.MolFromSmarts('c:c-c:c') #OK
+    smarts_pattern4_2 = Chem.MolFromSmarts('c:c:c:c') #OK
+    smarts_pattern5 = Chem.MolFromSmarts('[#6]-[#7]=[#8]')  #OK
+    smarts_pattern6 = Chem.MolFromSmarts('[C,c][CH3]')
+    smarts_pattern7 = Chem.MolFromSmarts('I-c:c:c') #OK           
+    smarts_pattern8 = Chem.MolFromSmarts('[C,c]:[C,c]-[F]') #OK            
+    smarts_pattern9_1 = Chem.MolFromSmarts('O-c:c-C') #OK
+    smarts_pattern9_2 = Chem.MolFromSmarts('O-c:[cH]:c') #OK
+    smarts_pattern10 = Chem.MolFromSmarts('[C,c][C;H2][C,c]') 
+    smarts_pattern11 = Chem.MolFromSmarts('S-[C,c]') #OK
+    smarts_pattern12 = Chem.MolFromSmarts('C-O-C=O') #OK
+    smarts_pattern13 = Chem.MolFromSmarts('[C](=O)(O)[C,c]') #OK
+    smarts_pattern14 = Chem.MolFromSmarts('[C;H1,H2](O)[C,c]') #OK
+    smarts_pattern15 = Chem.MolFromSmarts('Br-c:c-O') #OK
+    smarts_pattern16 = Chem.MolFromSmarts('O-[CH3]')  #OK
+    smarts_pattern17 = Chem.MolFromSmarts('[C;H1,H2](=O)[C,c]') #OK
+    smarts_pattern18 = Chem.MolFromSmarts('C=O')  #OK
+    smarts_pattern19 = Chem.MolFromSmarts('c:c-C=O') #OK
+    smarts_pattern20 = Chem.MolFromSmarts('[Br][C,c]') #OK
+    smarts_pattern21 = Chem.MolFromSmarts('N')  #OK
+    smarts_pattern22 = Chem.MolFromSmarts('Br-c:c-Br') #OK 
+    smiles_list = []
+    t = st.empty()
 
     # Placeholder for the spinner
     with st.spinner('CALCULATING DESCRIPTORS (STEP 1 OF 3)...'):
         time.sleep(1)  # Sleep for 5 seconds to mimic computation
         # Loop through each molecule in the dataset
   
-        # Create empty lists to store the results
-        results3 = []
-        results12 = []
-        results13 = []
-        results17 = []
-        results18 = []
-        molecule_counts1 = []
-        molecule_counts2 = []
-        molecule_counts4 = []
-        molecule_counts5 = []
-        molecule_counts6 = []
-        molecule_counts7 = []
-        molecule_counts8 = []
-        molecule_counts9 = []
-        molecule_counts10 = []
-        molecule_counts11 = []
-        molecule_counts14 = []
-        molecule_counts15 = []
-        molecule_counts16 = []
-        molecule_counts19 = []
-        molecule_counts20 = []
-        molecule_counts21 = []
-        molecule_counts22 = []
-    
-        # Define SMARTS patterns
-        smarts_pattern1 = Chem.MolFromSmarts('[Cl]-[*]')  #OKK
-        smarts_pattern2 = Chem.MolFromSmarts('[c;X3](c)(c)-[CH3]')  #OK
-        smarts_pattern3 = Chem.MolFromSmarts('[O]=C-[C]-O')  #OK
-        smarts_pattern4_1 = Chem.MolFromSmarts('c:c-c:c') #OK
-        smarts_pattern4_2 = Chem.MolFromSmarts('c:c:c:c') #OK
-        smarts_pattern5 = Chem.MolFromSmarts('[#6]-[#7]=[#8]')  #OK         #('[C][N+](=[O])[!H]') #('C-N=O')
-        smarts_pattern6 = Chem.MolFromSmarts('[C,c][CH3]')
-        smarts_pattern7 = Chem.MolFromSmarts('I-c:c:c') #OK           
-        smarts_pattern8 = Chem.MolFromSmarts('[C,c]:[C,c]-[F]') #OK            
-        smarts_pattern9_1 = Chem.MolFromSmarts('O-c:c-C') #OK
-        smarts_pattern9_2 = Chem.MolFromSmarts('O-c:[cH]:c') #OK
-        smarts_pattern10 = Chem.MolFromSmarts('[C,c][C;H2][C,c]') 
-        smarts_pattern11 = Chem.MolFromSmarts('S-[C,c]') #OK
-        smarts_pattern12 = Chem.MolFromSmarts('C-O-C=O') #OK
-        smarts_pattern13 = Chem.MolFromSmarts('[C](=O)(O)[C,c]') #OK
-        smarts_pattern14 = Chem.MolFromSmarts('[C;H1,H2](O)[C,c]') #OK
-        smarts_pattern15 = Chem.MolFromSmarts('Br-c:c-O') #OK
-        smarts_pattern16 = Chem.MolFromSmarts('O-[CH3]')  #OK
-        smarts_pattern17 = Chem.MolFromSmarts('[C;H1,H2](=O)[C,c]') #OK
-        smarts_pattern18 = Chem.MolFromSmarts('C=O')  #OK
-        smarts_pattern19 = Chem.MolFromSmarts('c:c-C=O') #OK
-        smarts_pattern20 = Chem.MolFromSmarts('[Br][C,c]') #OK
-        smarts_pattern21 = Chem.MolFromSmarts('N')  #OK
-        smarts_pattern22 = Chem.MolFromSmarts('Br-c:c-Br') #OK 
     
         
         for pos, row in data.iterrows():
