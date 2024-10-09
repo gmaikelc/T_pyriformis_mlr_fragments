@@ -464,20 +464,7 @@ def reading_reorder(data, loaded_desc):
 
     return test_data, id
 
-def reading_reorder2(data, loaded_desc2):
-        
-    #Select the specified columns from the DataFrame
-    df_selected2 = data[loaded_desc2]
-    df_id2 = data.reset_index()
-    df_id2.rename(columns={'index': 'NAME'}, inplace=True)
-    id2 = df_id2['NAME'] 
-    # Order the DataFrame by the specified list of columns
-    test_data2 = df_selected2.reindex(columns=loaded_desc2)
-    #descriptors_total = data[loaded_desc]
-    # Fill missing values with 0
-    test_data2 = test_data2.fillna(0)
 
-    return test_data2, id2
 
 
 
@@ -499,22 +486,7 @@ def normalize_data(train_data, test_data):
 
     return df_train_normalized, df_test_normalized
 
-#%% normalizing data2
-### ----------------------- ###
 
-def normalize_data2(train_data2, test_data2):
-    # Normalize the training data
-    df_train2 = pd.DataFrame(train_data2)
-    saved_cols2 = df_train2.columns
-    min_max_scaler2 = preprocessing.MinMaxScaler().fit(df_train2)
-    np_train_scaled2 = min_max_scaler2.transform(df_train2)
-    df_train_normalized2 = pd.DataFrame(np_train_scaled2, columns=saved_cols2)
-
-    # Normalize the test data using the scaler fitted on training data
-    np_test_scaled2 = min_max_scaler2.transform(test_data2)
-    df_test_normalized2 = pd.DataFrame(np_test_scaled2, columns=saved_cols2)
-
-    return df_train_normalized2, df_test_normalized2
 
 
 #%% Determining Applicability Domain (AD)
@@ -560,49 +532,6 @@ def applicability_domain(x_test_normalized, x_train_normalized):
     return h_results, leverage_train, leverage_test, std_residual_train 
 
 
-#%% Determining Applicability Domain (AD) 2
-
-def applicability_domain2(x_test_normalized2, x_train_normalized2):
-    y_train2=data_train2['pLC50_fw']
-    X_train2 = x_train_normalized2.values
-    X_test2 = x_test_normalized2.values
-    # Calculate leverage and standard deviation for the training set
-    hat_matrix_train2 = X_train2 @ np.linalg.inv(X_train2.T @ X_train2) @ X_train2.T
-    leverage_train2 = np.diagonal(hat_matrix_train2)
-    leverage_train2=leverage_train2.ravel()
-    
-    # Calculate leverage and standard deviation for the test set
-    hat_matrix_test2 = X_test2 @ np.linalg.inv(X_train2.T @ X_train2) @ X_test2.T
-    leverage_test2 = np.diagonal(hat_matrix_test2)
-    leverage_test2=leverage_test2.ravel()
-
-    from sklearn.linear_model import LinearRegression
-    from sklearn.metrics import mean_squared_error
-
-    # Train a linear regression model
-    lr2 = LinearRegression()
-    lr2.fit(df_train_normalized2, y_train2)
-    y_pred_train2 = lr2.predict(df_train_normalized2)
-    
-    std_dev_train2 = np.sqrt(mean_squared_error(y_train2, y_pred_train2))
-    std_residual_train2 = (y_train2 - y_pred_train2) / std_dev_train2
-    std_residual_train2 = std_residual_train2.ravel()
-    
-    # threshold for the applicability domain
-    
-    h3_2 = 3*((x_train_normalized2.shape[1]+1)/x_train_normalized2.shape[0])  
-    
-    diagonal_compare2 = list(leverage_test2)
-    h_results2 =[]
-    for valor2 in diagonal_compare2:
-        if valor2 < h3_2:
-            h_results2.append(True)
-        else:
-            h_results2.append(False)         
-    return h_results2, leverage_train2, leverage_test2, std_residual_train2 
-
-
-
 
  # Function to assign colors based on confidence values
 def get_color(confidence):
@@ -624,24 +553,7 @@ def get_color(confidence):
         confidence ==  "LOW"
         return 'red'
 
-def get_color2(confidence2):
-    """
-    Assigns a color based on the confidence value.
 
-    Args:
-        confidence (float): The confidence value.
-
-    Returns:
-        str: The color in hexadecimal format (e.g., '#RRGGBB').
-    """
-    # Define your color logic here based on confidence
-    if confidence2 == "HIGH" or confidence2 == "Inside AD":
-        return 'green'
-    elif confidence2 == "MEDIUM":
-        return 'yellow'
-    else:
-        confidence2 ==  "LOW"
-        return 'red'
 
 
 #%% Predictions        
@@ -717,76 +629,6 @@ def predictions(loaded_model, loaded_desc, df_test_normalized):
         return final_file, styled_df,leverage_train,std_residual_train, leverage_test, std_residual_test
 
 
-def predictions2(loaded_model2, loaded_desc2, df_test_normalized2):
-    scores2 = []
-    h_values2 = []
-    std_resd2 = []
-    idx = data['ID']
-    
-
-    descriptors_model2 = loaded_desc2
-    # Placeholder for the spinner
-    with st.spinner('CALCULATING PREDICTIONS (STEP 2 OF 3)...'):
-        # Simulate a long-running computation
-        time.sleep(1)  # Sleep for 5 seconds to mimic computation
-     
-        X2 = df_test_normalized2[descriptors_model2]
-        predictions2 = loaded_model2.predict(X2)
-        scores2.append(predictions2)
-        
-        # y_true and y_pred are the actual and predicted values, respectively
-    
-        # Create y_true array with all elements set to mean value and the same length as y_pred
-        y_pred_test2 = predictions2
-        y_test2 = np.full_like(y_pred_test2, mean_value2)
-        residuals_test2 = y_test2 -y_pred_test2
-
-        std_dev_test2 = np.sqrt(mean_squared_error(y_test2, y_pred_test2))
-        std_residual_test2 = (y_test2 - y_pred_test2) / std_dev_test2
-        std_residual_test2 = std_residual_test2.ravel()
-          
-        std_resd2.append(std_residual_test2)
-        
-        h_results2, leverage_train2, leverage_test2, std_residual_train2  = applicability_domain2(df_test_normalized2, df_train_normalized2)
-        h_values2.append(h_results2)
-    
-
-        dataframe_pred2 = pd.DataFrame(scores2).T
-        dataframe_pred2.index = idx
-        dataframe_pred2.rename(columns={0: "pLC50"},inplace=True)
-    
-        dataframe_std2 = pd.DataFrame(std_resd2).T
-        dataframe_std2.index = idx
-          
-        
-        h_final2 = pd.DataFrame(h_values2).T
-        h_final2.index = idx
-        h_final2.rename(columns={0: "Confidence"},inplace=True)
-
-        std_ensemble2 = dataframe_std2.iloc[:,0]
-        # Create a mask using boolean indexing
-        std_ad_calc2 = (std_ensemble2 >= 3) | (std_ensemble2 <= -3) 
-        std_ad_calc2 = std_ad_calc2.replace({True: 'Outside AD', False: 'Inside AD'})
-   
-    
-        final_file2 = pd.concat([std_ad_calc2,h_final2,dataframe_pred2], axis=1)
-    
-        final_file2.rename(columns={0: "Std_residual"},inplace=True)
-    
-        h3_2 = 3*((df_train_normalized2.shape[1]+1)/df_train_normalized2.shape[0])  ##  Mas flexible
-
-        final_file2.loc[(final_file2["Confidence"] == True) & ((final_file2["Std_residual"] == 'Inside AD' )), 'Confidence'] = 'HIGH'
-        final_file2.loc[(final_file2["Confidence"] == True) & ((final_file2["Std_residual"] == 'Outside AD')), 'Confidence'] = 'LOW'
-        final_file2.loc[(final_file2["Confidence"] == False) & ((final_file["Std_residual"] == 'Outside AD')), 'Confidence'] = 'LOW'
-        final_file2.loc[(final_file2["Confidence"] == False) & ((final_file["Std_residual"] == 'Inside AD')), 'Confidence'] = 'MEDIUM'
-
-
-            
-        df_no_duplicates2 = final_file2[~final_file2.index.duplicated(keep='first')]
-        styled_df2 = df_no_duplicates2.style.apply(lambda row: [f"background-color: {get_color2(row['Confidence'])}" for _ in row],subset=["Confidence"], axis=1)
-    
-        return final_file2, styled_df2,leverage_train2,std_residual_train2, leverage_test2, std_residual_test2
-
 
 
 #Calculating the William's plot limits
@@ -837,53 +679,6 @@ def calculate_wp_plot_limits(leverage_train,std_residual_train, x_std_max=4, x_s
         return x_lim_max_std, x_lim_min_std, h_critical, x_lim_max_lev, x_lim_min_lev
 
 
-
-#Calculating the William's plot limits GRAPH 2
-def calculate_wp_plot_limits2(leverage_train2,std_residual_train2, x_std_max2=4, x_std_min2=-4):
-    
-    with st.spinner('CALCULATING APPLICABILITY DOMAIN (STEP 3 OF 3)...'):
-        # Simulate a long-running computation
-        time.sleep(1)  # Sleep for 5 seconds to mimic computation
-        # Getting maximum std value
-        if std_residual_train2.max() < 4:
-            x_lim_max_std2 = x_std_max2
-        elif std_residual_train2.max() > 4:
-            x_lim_max_std2 = round(std_residual_train2.max()) + 1
-
-        # Getting minimum std value
-        if std_residual_train2.min() > -4:
-            x_lim_min_std2 = x_std_min2
-        elif std_residual_train2.min() < 4:
-            x_lim_min_std2 = round(std_residual_train2.min()) - 1
-
-    
-        #st.write('x_lim_max_std:', x_lim_max_std2)
-        #st.write('x_lim_min_std:', x_lim_min_std2)
-
-        # Calculation H critical
-        n2 = len(leverage_train2)
-        p2 = df_train_normalized2.shape[1]
-        h_value2 = 3 * (p2 + 1) / n2
-        h_critical2 = round(h_value2, 4)
-        #st.write('Number of cases training:', n)
-        #st.write('Number of variables:', p)
-        #st.write('h_critical:', h_critical)
-
-        # Getting maximum leverage value
-        if leverage_train2.max() < h_critical2:
-            x_lim_max_lev2 = h_critical2 + h_critical2 * 0.5
-        elif leverage_train2.max() > h_critical2:
-            x_lim_max_lev2 = leverage_train2.max() + (leverage_train2.max()) * 0.1
-
-        # Getting minimum leverage value
-        if leverage_train2.min() < 0:
-            x_lim_min_lev2 = x_lev_min2 - x_lev_min2 * 0.05
-        elif leverage_train2.min() > 0:
-            x_lim_min_lev2 = 0
-
-        #st.write('x_lim_max_lev:', x_lim_max_lev2)
-
-        return x_lim_max_std2, x_lim_min_std2, h_critical2, x_lim_max_lev2, x_lim_min_lev2
 
 
 import pandas as pd
@@ -964,80 +759,6 @@ def williams_plot(leverage_train, leverage_test, std_residual_train, std_residua
 
     return fig
 
-#GRAPH 2     
-def williams_plot2(leverage_train2, leverage_test2, std_residual_train2, std_residual_test2,id_list_2,
-                  plot_color='cornflowerblue', show_plot=True, save_plot=False, filename=None, add_title=False, title=None):
-    fig2 = go.Figure()
-
-    # Add training data points
-    fig2.add_trace(go.Scatter(
-        x=leverage_train2,
-        y=std_residual_train2,
-        mode='markers',
-        marker=dict(color='cornflowerblue', size=10, line=dict(width=1, color='black')),
-        name='Training'
-    ))
-
-    # Add test data points
-    fig2.add_trace(go.Scatter(
-        x=leverage_test2,
-        y=std_residual_test2,
-        mode='markers',
-        marker=dict(color='orange', size=10, line=dict(width=1, color='black')),
-        name='Prediction',
-        text = id_list_2, # Add compounds IDs for hover
-        hoverinfo = 'text' #Show only the text when hovering
-    ))
-
-    # Add horizontal and vertical dashed lines
-    fig2.add_shape(type='line', x0=h_critical2, y0=x_lim_min_std2, x1=h_critical2, y1=x_lim_max_std2,
-                  line=dict(color='black', dash='dash'))
-    fig2.add_shape(type='line', x0=x_lim_min_lev2, y0=3, x1=x_lim_max_lev2, y1=3,
-                  line=dict(color='black', dash='dash'))
-    fig2.add_shape(type='line', x0=x_lim_min_lev2, y0=-3, x1=x_lim_max_lev2, y1=-3,
-                  line=dict(color='black', dash='dash'))
-
-    # Add rectangles for outlier zones
-    fig2.add_shape(type='rect', x0=x_lim_min_lev2, y0=x_lim_min_std2, x1=h_critical2, y1=-3,
-                  fillcolor='lightgray', opacity=0.4, line_width=0)
-    fig2.add_shape(type='rect', x0=x_lim_min_lev2, y0=3, x1=h_critical2, y1=x_lim_max_std2,
-                  fillcolor='lightgray', opacity=0.4, line_width=0)
-                      
-    fig2.add_shape(type='rect', x0=h_critical2, y0=x_lim_min_std2, x1=x_lim_max_lev2, y1=-3,
-                  fillcolor='lightgray', opacity=0.4, line_width=0)
-    fig2.add_shape(type='rect', x0=h_critical2, y0=3, x1=x_lim_max_lev2, y1=x_lim_max_std2,
-                  fillcolor='lightgray', opacity=0.4, line_width=0)
-
-    # Add annotations for outlier zones
-    fig2.add_annotation(x=(h_critical2 + x_lim_min_lev2) / 2, y=-3.5, text='Outlier zone', showarrow=False,
-                       font=dict(size=15))
-    fig2.add_annotation(x=(h_critical2 + x_lim_min_lev2) / 2, y=3.5, text='Outlier zone', showarrow=False,
-                       font=dict(size=15))
-    fig2.add_annotation(x=(h_critical2 + x_lim_max_lev2) / 2, y=-3.5, text='Outlier zone', showarrow=False,
-                       font=dict(size=15))
-    fig2.add_annotation(x=(h_critical2 + x_lim_max_lev2) / 2, y=3.5, text='Outlier zone', showarrow=False,
-                       font=dict(size=15))
-
-    # Update layout
-    fig2.update_layout(
-        width=600,
-        height=600,
-        xaxis=dict(title='Leverage', range=[x_lim_min_lev2, x_lim_max_lev2], tickfont=dict(size=15)),
-        yaxis=dict(title='Std Residuals', range=[x_lim_min_std2, x_lim_max_std2], tickfont=dict(size=15)),
-        legend=dict(x=0.99, y=0.825, xanchor='right', yanchor='top', font=dict(size=20)),
-        showlegend=True
-    )
-
-    if add_title and title:
-        fig2.update_layout(title=dict(text=title, font=dict(size=20)))
-
-    if save_plot and filename:
-        fig2.write_image(filename)
-
-    if show_plot:
-        fig2.show()
-
-    return fig2
 
 #%%
 def filedownload1(df):
@@ -1046,11 +767,7 @@ def filedownload1(df):
     href = f'<a href="data:file/csv;base64,{b64}" download="ml_toxicity_rotifer_pLC50_results_saltwater.csv">Download CSV File with results</a>'
     return href
 
-def filedownload2(df):
-    csv = df.to_csv(index=True,header=True)
-    b64 = base64.b64encode(csv.encode()).decode()  # strings <-> bytes conversions
-    href = f'<a href="data:file/csv;base64,{b64}" download="ml_toxicity_rotifer_pLC50_results_freshwater.csv">Download CSV File with results</a>'
-    return href
+
 
 
 
@@ -1061,14 +778,7 @@ mean_value = data_train['pLC50_sw'].mean()
 loaded_model = pickle.load(open("models/" + "ml_model_rotifer_sw.pickle", 'rb'))
 loaded_desc = pickle.load(open("models/" + "ml_descriptor_rotifer_sw.pickle", 'rb'))
 
-#data_train2 = pd.read_csv("data/" + "data_126c_15var_pLC50_train_sw.csv")
-#mean_value2 = data_train2['pLC50_sw'].mean()
-#loaded_model2 = pickle.load(open("models/" + "ml_model_rotifer_sw.pickle", 'rb'))
-#loaded_desc2 = pickle.load(open("models/" + "ml_descriptor_rotifer_sw.pickle", 'rb'))
-data_train2 = pd.read_csv("data/" + "data_126c_15var_pLC50_train_fw.csv")
-mean_value2 = data_train2['pLC50_fw'].mean()
-loaded_model2 = pickle.load(open("models/" + "ml_model_rotifer_fw.pickle", 'rb'))
-loaded_desc2 = pickle.load(open("models/" + "ml_descriptor_rotifer_fw.pickle", 'rb'))
+
 
 
 
@@ -1079,66 +789,48 @@ if uploaded_file_1 is not None:
         data = pd.read_csv(uploaded_file_1,) 
         
         train_data = data_train[loaded_desc]
-        train_data2 = data_train2[loaded_desc2]
         
         # Calculate descriptors and SMILES for the first data
         descriptors_total_1, smiles_list_1 = calc_descriptors(data, 1)
-        # Calculate descriptors and SMILES for the second data
-        descriptors_total_2, smiles_list_2 = calc_descriptors(data, 1)
+     
 
         
                  
         #Selecting the descriptors based on model for salt water component
         test_data1, id_list_1 =  reading_reorder(descriptors_total_1,loaded_desc)
-        #Selecting the descriptors based on model for first component
-        test_data2, id_list_2 =  reading_reorder2(descriptors_total_2,loaded_desc2)
+      
  
         # Save DataFrame as CSV
         #csv = test_data1.to_csv(index=False)
 
-        # Provide a download button in Streamlit
-        #st.download_button(
-         #   label="Download CSV",
-          #  data=csv,
-          #  file_name='my_dataframe.csv',
-          #  mime='text/csv'
-       # )                                  
+                                
         
         X_final2= test_data1
-        X_final4 = test_data2
+      
         
         df_train_normalized, df_test_normalized = normalize_data(train_data, X_final2)
-        df_train_normalized2, df_test_normalized2 = normalize_data2(train_data2, X_final4)
+      
         
         #st.markdown(filedownload5(df_test_normalized), unsafe_allow_html=True)
         
         final_file, styled_df,leverage_train,std_residual_train, leverage_test, std_residual_test= predictions(loaded_model, loaded_desc, df_test_normalized)
-        final_file2, styled_df2,leverage_train2,std_residual_train2, leverage_test2, std_residual_test2= predictions2(loaded_model2, loaded_desc2, df_test_normalized2)
+       
         
         x_lim_max_std, x_lim_min_std, h_critical, x_lim_max_lev, x_lim_min_lev = calculate_wp_plot_limits(leverage_train,std_residual_train, x_std_max=4, x_std_min=-4)
-        x_lim_max_std2, x_lim_min_std2, h_critical2, x_lim_max_lev2, x_lim_min_lev2 = calculate_wp_plot_limits2(leverage_train2,std_residual_train2, x_std_max2=4, x_std_min2=-4)
-        
+       
         figure  = williams_plot(leverage_train, leverage_test, std_residual_train, std_residual_test,id_list_1)
-        figure2  = williams_plot2(leverage_train2, leverage_test2, std_residual_train2, std_residual_test2,id_list_2)   
-        col1, col2 = st.columns(2)
+         
+        col1, = st.columns(1)
 
         with col1:
-            st.header("Salt Water",divider='blue')
+            st.header("Tetrahymena pyriformis",divider='blue')
             st.subheader(r'Predictions')
             st.write(styled_df)
             st.markdown("<h2 style='text-align: center; font-size: 30px;'>William's Plot (Applicability Domain)</h2>", unsafe_allow_html=True)
             st.plotly_chart(figure,use_container_width=True)
-            st.markdown(":point_down: **Here you can download the results for Salt Water model**", unsafe_allow_html=True,)
+            st.markdown(":point_down: **Here you can download the results for T. pyriformis MLR model**", unsafe_allow_html=True,)
             st.markdown(filedownload1(final_file), unsafe_allow_html=True)
-        with col2:
-            st.header("Fresh Water",divider='blue')
-            st.subheader(r'Predictions')
-            st.write(styled_df2)
-            st.markdown("<h2 style='text-align: center; font-size: 30px;'>William's Plot (Applicability Domain)</h2>", unsafe_allow_html=True)
-            st.plotly_chart(figure2,use_container_width=True)
-            st.markdown(":point_down: **Here you can download the results for Fresh Water model**", unsafe_allow_html=True,)
-            st.markdown(filedownload2(final_file2), unsafe_allow_html=True)
-        
+    
        
 
 # Example file
@@ -1148,38 +840,34 @@ else:
         data = pd.read_csv("virtual_smi_example.csv")
         
         train_data = data_train[loaded_desc]
-        train_data2 = data_train2[loaded_desc2]
+        
         
         # Calculate descriptors and SMILES for the first data
         descriptors_total_1, smiles_list_1 = calc_descriptors(data, 1)
-        # Calculate descriptors and SMILES for the second data
-        descriptors_total_2, smiles_list_2 = calc_descriptors(data, 1)
+    
 
         
                  
         #Selecting the descriptors based on model for salt water component
         test_data1, id_list_1 =  reading_reorder(descriptors_total_1,loaded_desc)
-        #Selecting the descriptors based on model for first component
-        test_data2, id_list_2 =  reading_reorder2(descriptors_total_2,loaded_desc2)
+        
  
 
         
         X_final2= test_data1
-        X_final4 = test_data2
+        
         
         df_train_normalized, df_test_normalized = normalize_data(train_data, X_final2)
-        df_train_normalized2, df_test_normalized2 = normalize_data2(train_data2, X_final4)
-        #st.markdown(filedownload5(df_test_normalized), unsafe_allow_html=True)
+      
         
         final_file, styled_df,leverage_train,std_residual_train, leverage_test, std_residual_test= predictions(loaded_model, loaded_desc, df_test_normalized)
-        final_file2, styled_df2,leverage_train2,std_residual_train2, leverage_test2, std_residual_test2= predictions2(loaded_model2, loaded_desc2, df_test_normalized2)
+        
         
         x_lim_max_std, x_lim_min_std, h_critical, x_lim_max_lev, x_lim_min_lev = calculate_wp_plot_limits(leverage_train,std_residual_train, x_std_max=4, x_std_min=-4)
-        x_lim_max_std2, x_lim_min_std2, h_critical2, x_lim_max_lev2, x_lim_min_lev2 = calculate_wp_plot_limits2(leverage_train2,std_residual_train2, x_std_max2=4, x_std_min2=-4)
         
         figure  = williams_plot(leverage_train, leverage_test, std_residual_train, std_residual_test,id_list_1)
-        figure2  = williams_plot2(leverage_train2, leverage_test2, std_residual_train2, std_residual_test2,id_list_2)   
-        col1, col2 = st.columns(2)
+    
+        col1 = st.columns(1)
 
         with col1:
             st.header("Salt Water",divider='blue')
@@ -1189,14 +877,7 @@ else:
             st.plotly_chart(figure,use_container_width=True)
             st.markdown(":point_down: **Here you can download the results for Salt Water model**", unsafe_allow_html=True,)
             st.markdown(filedownload1(final_file), unsafe_allow_html=True)
-        with col2:
-            st.header("Fresh Water",divider='blue')
-            st.subheader(r'Predictions')
-            st.write(styled_df2)
-            st.markdown("<h2 style='text-align: center; font-size: 30px;'>William's Plot (Applicability Domain)</h2>", unsafe_allow_html=True)
-            st.plotly_chart(figure2,use_container_width=True)
-            st.markdown(":point_down: **Here you can download the results for Fresh Water model**", unsafe_allow_html=True,)
-            st.markdown(filedownload2(final_file2), unsafe_allow_html=True)
+
 
 
 
@@ -1217,36 +898,26 @@ if on2:
         data = pd.DataFrame({'ID': [ID], 'Smiles_1': [smiles_list]})
 
         train_data = data_train[loaded_desc]
-        train_data2 = data_train2[loaded_desc2]
         
         # Calculate descriptors and SMILES for the first data
         descriptors_total_1, smiles_list_1 = calc_descriptors(data, 1)
-        # Calculate descriptors and SMILES for the second data
-        descriptors_total_2, smiles_list_2 = calc_descriptors(data, 1)
-        
                  
         #Selecting the descriptors based on model for salt water component
         test_data1, id_list_1 =  reading_reorder(descriptors_total_1,loaded_desc)
-        #Selecting the descriptors based on model for first component
-        test_data2, id_list_2 =  reading_reorder2(descriptors_total_2,loaded_desc2)
-                          
-        
+                  
         X_final2= test_data1
-        X_final4 = test_data2
-        
+ 
         df_train_normalized, df_test_normalized = normalize_data(train_data, X_final2)
         df_train_normalized2, df_test_normalized2 = normalize_data2(train_data2, X_final4)
         #st.markdown(filedownload5(df_test_normalized), unsafe_allow_html=True)
         
         final_file, styled_df,leverage_train,std_residual_train, leverage_test, std_residual_test= predictions(loaded_model, loaded_desc, df_test_normalized)
-        final_file2, styled_df2,leverage_train2,std_residual_train2, leverage_test2, std_residual_test2= predictions2(loaded_model2, loaded_desc2, df_test_normalized2)
         
         x_lim_max_std, x_lim_min_std, h_critical, x_lim_max_lev, x_lim_min_lev = calculate_wp_plot_limits(leverage_train,std_residual_train, x_std_max=4, x_std_min=-4)
-        x_lim_max_std2, x_lim_min_std2, h_critical2, x_lim_max_lev2, x_lim_min_lev2 = calculate_wp_plot_limits2(leverage_train2,std_residual_train2, x_std_max2=4, x_std_min2=-4)
         
         figure  = williams_plot(leverage_train, leverage_test, std_residual_train, std_residual_test,id_list_1)
-        figure2  = williams_plot2(leverage_train2, leverage_test2, std_residual_train2, std_residual_test2,id_list_2)   
-        col1, col2 = st.columns(2)
+        
+        col1 = st.columns(1)
 
         with col1:
             st.header("Salt Water",divider='blue')
@@ -1256,17 +927,6 @@ if on2:
             st.plotly_chart(figure,use_container_width=True)
             st.markdown(":point_down: **Here you can download the results for Salt Water model**", unsafe_allow_html=True,)
             st.markdown(filedownload1(final_file), unsafe_allow_html=True)
-        with col2:
-            st.header("Fresh Water",divider='blue')
-            st.subheader(r'Predictions')
-            st.write(styled_df2)
-            st.markdown("<h2 style='text-align: center; font-size: 30px;'>William's Plot (Applicability Domain)</h2>", unsafe_allow_html=True)
-            st.plotly_chart(figure2,use_container_width=True)
-            st.markdown(":point_down: **Here you can download the results for Fresh Water model**", unsafe_allow_html=True,)
-            st.markdown(filedownload2(final_file2), unsafe_allow_html=True)
-
-           
-        
 
 #Footer edit
 
