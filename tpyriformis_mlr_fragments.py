@@ -741,19 +741,17 @@ def filedownload1(df):
 
 
 # Create a function to generate an image with a specific SMARTS pattern highlighted
-def generate_molecule_image(smiles, highlight_mol, mol_size=(300, 300), color=(1, 0, 0)):
+def generate_molecule_image(smiles, highlight_mol, color=(1, 0, 0), mol_size=(300, 300)):
+    # Function to generate a molecule image with highlighted substructure
     mol = Chem.MolFromSmiles(smiles)
     if mol:
-        rdDepictor.Compute2DCoords(mol)  # Compute 2D coordinates for better depiction
-        # Prepare a drawer
+        rdDepictor.Compute2DCoords(mol)
         drawer = rdMolDraw2D.MolDraw2DCairo(mol_size[0], mol_size[1])
         
-        # Find the substructure match and set highlight color
         match = mol.GetSubstructMatch(highlight_mol)
         highlight_atoms = list(match) if match else []
         highlight_colors = {atom_idx: color for atom_idx in highlight_atoms}
         
-        # Draw the molecule with highlighted atoms
         drawer.DrawMolecule(mol, highlightAtoms=highlight_atoms, highlightAtomColors=highlight_colors)
         drawer.FinishDrawing()
         img = drawer.GetImage()
@@ -846,8 +844,6 @@ else:
     
         col1, col2 = st.columns(2)
 
-        col1, col2 = st.columns(2)
-
         with col1:
             st.header("Tetrahymena pyriformis",divider='blue')
             st.subheader(r'Predictions')
@@ -863,19 +859,21 @@ else:
 
         # Iterate over the first 5 rows of the dataframe
         for index, row in data.head(5).iterrows():
-            molecule_id = row.iloc[0]
-            smiles = row.iloc[1]
+            molecule_id = row.iloc[0]  # Assuming molecule ID is in the first column
+            smiles = row.iloc[1]  # Assuming SMILES string is in the second column
             st.subheader(f"Molecule ID: {molecule_id}")
-        
+            
             # Iterate over SMARTS patterns and generate separate images
             for i, (smarts_name, highlight_mol) in enumerate(highlight_mols.items()):
                 # Choose different color for each SMARTS pattern
                 colors = [(1, 0, 0), (0, 1, 0), (0, 0, 1)]  # Red, Green, Blue for different SMARTS
                 img = generate_molecule_image(smiles, highlight_mol, color=colors[i])
                 
-                # Display each molecule image with the SMARTS name and Molecule ID
-                st.image(img, caption=f'Molecule ID: {molecule_id} - Highlight: {smarts_name}', use_column_width=True)
-        
+                if img:
+                    st.image(img, caption=f'Molecule ID: {molecule_id} - Highlight: {smarts_name}', use_column_width=True)
+                else:
+                    st.write(f"Could not generate image for Molecule ID: {molecule_id} - SMARTS: {smarts_name}")
+                
         
        
 ## From Drawn Structure ##########################
