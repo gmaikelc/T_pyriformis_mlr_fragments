@@ -67,7 +67,7 @@ import time
 #---------------------------------#
 # Page layout
 ## Page expands to full width
-st.set_page_config(page_title='ML predictor for Aquatic Ecotoxicology prediction of Rotifer species', page_icon=":computer:", layout='wide')
+st.set_page_config(page_title='Tetrahymena pyriformis ecotoxicity predicion based on Chemical Fragment and Explainable Machine Learning Approaches', page_icon=":computer:", layout='wide')
 
 ######
 # Function to put a picture as header   
@@ -81,20 +81,18 @@ st.image(image)
 
 
 
-#st.title(':computer: ml rotifer sp toxicity in water')
+#st.title(':computer: t pyriformis ecotoxicity fragments')
 #with st.expander("<span style='color: blue;'>More information</span>", expanded=True):
 with st.expander("More information",):
     st.write("""
 
-    **It is a free web-application for Aquatic Ecotoxicology prediction in Rotifer species**
+    **It is a free web-application for Ecotoxicology prediction in Tetrahymena Pyriformis based on Chemical Fragments**
 
-    Among the organisms used to assess water quality and environmental toxicity are rotifers. These invertebrate species are abundant and widely distributed
-    in aquatic ecosystems and can therefore play an essential role in the ecological processes of aquatic ecosystems. Due to their rapid population turnover rate, 
-    rotifers contribute significantly to nutrient recycling in aquatic habitats. Therefore, if rotifer populations are negatively affected by a toxin, 
-    the function of aquatic ecosystems could be altered. Rotifers have been used as model organisms to evaluate the toxicity 
-    of many environmental chemicals, including heavy metals, organic compounds, and nano-sized materials .
+   The impact of the aquatic environment can be determined with the testing based on the concentration of growth inhibition (IGC50) on the ciliated protozoan
+   Tetrahymena pyriformis, which are an early warning of a toxic hazard to be at the top trophic levels in aquatic ecosystems. This organism is considered adequate
+   for toxicological and safety testing of chemicals.
 
-    The ML Aquatic Ecotox Rotifer sp predictor is a Web App that use Machine Learning to predict the aquatic ecotoxicology risk assesment of organic compounds. 
+    The ML Aquatic Ecotox Tetrahymena sp predictor is a Web App that use Machine Learning to predict the aquatic ecotoxicology risk assesment of organic compounds. 
 
     The tool uses the following packages [RDKIT](https://www.rdkit.org/docs/index.html), [Mordred](https://github.com/mordred-descriptor/mordred), [MOLVS](https://molvs.readthedocs.io/), [Openbabel](https://github.com/openbabel/openbabel),
     [Scikit-learn](https://scikit-learn.org/stable/)
@@ -103,14 +101,14 @@ with st.expander("More information",):
 
 with st.expander("**Workflow**"):
     image = Image.open('toc.png')
-    st.image(image, caption='ML Rotifer Aquatic Toxicity workflow')
+    st.image(image, caption='Fragment-based Tetrahymena Ecotoxicity workflow')
 
 
 #---------------------------------#
 # Sidebar - Collects user input features into dataframe
 st.sidebar.header('Upload your CSV file')
 st.sidebar.markdown("""
-[Example CSV input file](https://raw.githubusercontent.com/gmaikelc/rotifer_ml_predictor/main/virtual_smi_example.csv) 
+[Example CSV input file](https://raw.githubusercontent.com/gmaikelc/T_pyriformis_mlr_fragments/main/virtual_smi_example.csv) 
 """)
 
 uploaded_file_1 = st.sidebar.file_uploader("Upload a CSV file with SMILES and fractions", type=["csv"])
