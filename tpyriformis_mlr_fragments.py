@@ -773,10 +773,10 @@ def filedownload1(df):
 
 #%% RUN
 
-data_train = pd.read_csv("data/" + "data_126c_15var_pLC50_train_sw.csv")
-mean_value = data_train['pLC50_sw'].mean()
-loaded_model = pickle.load(open("models/" + "ml_model_rotifer_sw.pickle", 'rb'))
-loaded_desc = pickle.load(open("models/" + "ml_descriptor_rotifer_sw.pickle", 'rb'))
+data_train = pd.read_csv("data/" + "data_Tpyriformis_22var_original_training.csv")
+mean_value = data_train['pLC50'].mean()
+loaded_model = pickle.load(open("models/" + "ml_model_tetrahymena_pyriformis_structural.pickle", 'rb'))
+loaded_desc = pickle.load(open("models/" + "ml_descriptor_tetrahymena_pyriformis_structural.pickle", 'rb'))
 
 
 
