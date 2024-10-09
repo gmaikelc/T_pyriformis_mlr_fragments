@@ -739,12 +739,43 @@ def filedownload1(df):
     href = f'<a href="data:file/csv;base64,{b64}" download="ml_toxicity_t_pyriformis_pLC50_results.csv">Download CSV File with results</a>'
     return href
 
+
+# Create a function to generate an image with a specific SMARTS pattern highlighted
+def generate_molecule_image(smiles, highlight_mol, mol_size=(300, 300), color=(1, 0, 0)):
+    mol = Chem.MolFromSmiles(smiles)
+    if mol:
+        rdDepictor.Compute2DCoords(mol)  # Compute 2D coordinates for better depiction
+        # Prepare a drawer
+        drawer = rdMolDraw2D.MolDraw2DCairo(mol_size[0], mol_size[1])
+        
+        # Find the substructure match and set highlight color
+        match = mol.GetSubstructMatch(highlight_mol)
+        highlight_atoms = list(match) if match else []
+        highlight_colors = {atom_idx: color for atom_idx in highlight_atoms}
+        
+        # Draw the molecule with highlighted atoms
+        drawer.DrawMolecule(mol, highlightAtoms=highlight_atoms, highlightAtomColors=highlight_colors)
+        drawer.FinishDrawing()
+        img = drawer.GetImage()
+        return Image.open(img)
+
 #%% RUN
 
 data_train = pd.read_csv("data/" + "data_Tpyriformis_22var_original_training.csv")
 mean_value = data_train['pLC50'].mean()
 loaded_model = pickle.load(open("models/" + "ml_model_tetrahymena_pyriformis_structural.pickle", 'rb'))
 loaded_desc = pickle.load(open("models/" + "ml_descriptor_tetrahymena_pyriformis_structural.pickle", 'rb'))
+
+# Define the SMARTS patterns you want to highlight
+smarts_patterns = {
+    'O=C-C-O': '[O]=C-[C]-O',
+    'C-C-F': '[C,c]:[C,c]-[F]',
+    '(C=O,(C-C),xC': '[C;H1,H2](=O)[C,c]'
+}
+
+# Compile SMARTS patterns into RDKit Mol objects
+highlight_mols = {name: Chem.MolFromSmarts(pattern) for name, pattern in smarts_patterns.items()}
+
 
 
 #Uploaded file calculation ####
@@ -783,7 +814,9 @@ if uploaded_file_1 is not None:
             st.plotly_chart(figure,use_container_width=True)
         st.markdown(":point_down: **Here you can download the results for T. pyriformis MLR model**", unsafe_allow_html=True,)
         st.markdown(filedownload1(final_file), unsafe_allow_html=True)
-    
+
+        # Display the top molecule with each SMARTS highlighted in separate images
+        st.title("Molecule with Highlighted Substructures")
        
 
 # Example file
@@ -825,7 +858,26 @@ else:
         st.markdown(":point_down: **Here you can download the results for T. pyriformis MLR model**", unsafe_allow_html=True,)
         st.markdown(filedownload1(final_file), unsafe_allow_html=True)
 
+        # Display the top molecule with each SMARTS highlighted in separate images
+        st.title("Molecule with Highlighted Substructures")
+
+        # Iterate over the first 5 rows of the dataframe
+        for index, row in data.head(5).iterrows():
+            molecule_id = row.iloc[0]
+            smiles = row.iloc[1]
+            st.subheader(f"Molecule ID: {molecule_id}")
         
+            # Iterate over SMARTS patterns and generate separate images
+            for i, (smarts_name, highlight_mol) in enumerate(highlight_mols.items()):
+                # Choose different color for each SMARTS pattern
+                colors = [(1, 0, 0), (0, 1, 0), (0, 0, 1)]  # Red, Green, Blue for different SMARTS
+                img = generate_molecule_image(smiles, highlight_mol, color=colors[i])
+                
+                # Display each molecule image with the SMARTS name and Molecule ID
+                st.image(img, caption=f'Molecule ID: {molecule_id} - Highlight: {smarts_name}', use_column_width=True)
+        
+        
+       
 ## From Drawn Structure ##########################
 on2 = st.toggle('Use drawn structure',key="13")
 with st.expander("SMILES editor"):
