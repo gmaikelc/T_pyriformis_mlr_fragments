@@ -878,7 +878,8 @@ else:
                 
                 if img:
                   # Directly display the RDKit-generated image
-                    display(img)
+                    st.image(img, caption=f'Molecule ID: {molecule_id} - Highlight: {smarts_name}', use_column_width=True)
+                    #display(img)
                     print(f'Molecule ID: {molecule_id} - Highlight: {smarts_name}')
                 else:
                     print(f"Could not generate image for Molecule ID: {molecule_id} - SMARTS: {smarts_name}")
