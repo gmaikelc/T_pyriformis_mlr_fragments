@@ -193,256 +193,253 @@ def formal_charge_calculation(descriptors):
     descriptors["Formal_charge"] = charges
     return descriptors
 
-
-
-#%% B04[O-O] descriptor calculation
-
-def check_oo_distance(descriptors):
-    # Initialize a list to store the results
-    smiles_list = descriptors["Smiles_OK"]
-    distance4 = []
-    
-    # Iterate over the SMILES in the specified column of the DataFrame
-    for smiles in smiles_list:
-        # Convert SMILES to RDKit Mol object
-        mol = Chem.MolFromSmiles(smiles)
-        if mol is None:
-            # Append NaN if SMILES cannot be converted to a molecule
-            distance4.append(float('nan'))
-            continue
-        
-        # Generate the molecular graph representation
-        mol_graph = Chem.RWMol(mol)
-        Chem.SanitizeMol(mol_graph)
-        mol_graph = Chem.RemoveHs(mol_graph)
-        mol_graph = Chem.GetAdjacencyMatrix(mol_graph)
-        G = nx.Graph(mol_graph)
-        
-        # Initialize the presence/absence flag
-        presence_flag = 0
-        
-        # Find all pairs of oxygen atoms in the molecule
-        oxygen_atoms = [atom.GetIdx() for atom in mol.GetAtoms() if atom.GetSymbol() == 'O']
-        
-        # Check for paths of length 4 between oxygen atoms
-        for source in oxygen_atoms:
-            for target in oxygen_atoms:
-                if source != target:
-                    # Use networkx shortest_path_length to check the shortest path length
-                    shortest_path_length = nx.shortest_path_length(G, source=source, target=target)
-                    if shortest_path_length == 4:
-                        presence_flag = 1
-                        break
-            if presence_flag == 1:
-                break
-        
-        # Append the result to the list
-        distance4.append(presence_flag)
-    
-    # Add the results as a new column in the DataFrame
-    descriptors['B04[O-O]'] = distance4
-    
-    return descriptors
-
-#%% B07[Cl-Cl] descriptor calculation
-
-def check_clcl_distance(descriptors):
-    # Initialize a list to store the results
-    smiles_list = descriptors["Smiles_OK"]
-    distance7 = []
-    
-    # Iterate over the SMILES in the specified column of the DataFrame
-    for smiles in smiles_list:
-        # Convert SMILES to RDKit Mol object
-        mol = Chem.MolFromSmiles(smiles)
-        if mol is None:
-            # Append NaN if SMILES cannot be converted to a molecule
-            distance7.append(float('nan'))
-            continue
-        
-        # Generate the molecular graph representation
-        mol_graph = Chem.RWMol(mol)
-        Chem.SanitizeMol(mol_graph)
-        mol_graph = Chem.RemoveHs(mol_graph)
-        mol_graph = Chem.GetAdjacencyMatrix(mol_graph)
-        G = nx.Graph(mol_graph)
-        
-        # Initialize the presence/absence flag
-        presence_flag = 0
-        
-        # Find all pairs of oxygen atoms in the molecule
-        chloride_atoms = [atom.GetIdx() for atom in mol.GetAtoms() if atom.GetSymbol() == 'Cl']
-        
-        # Check for paths of length 7 between chloride atoms
-        for source in chloride_atoms:
-            for target in chloride_atoms:
-                if source != target:
-                    # Use networkx shortest_path_length to check the shortest path length
-                    shortest_path_length = nx.shortest_path_length(G, source=source, target=target)
-                    if shortest_path_length == 7:
-                        presence_flag = 1
-                        break
-            if presence_flag == 1:
-                break
-        
-        # Append the result to the list
-        distance7.append(presence_flag)
-    
-    # Add the results as a new column in the DataFrame
-    descriptors['B07[Cl-Cl]'] = distance7
-    
-    return descriptors
-
-
-from rdkit import Chem
-import networkx as nx
-
-def check_clc_distance(descriptors):
-    # Initialize a list to store the results
-    smiles_list = descriptors["Smiles_OK"]
-    distance2 = []
-    
-    # Iterate over the SMILES in the specified column of the DataFrame
-    for smiles in smiles_list:
-        # Convert SMILES to RDKit Mol object
-        mol = Chem.MolFromSmiles(smiles)
-        if mol is None:
-            # Append NaN if SMILES cannot be converted to a molecule
-            distance2.append(float('nan'))
-            continue
-        
-        # Generate the molecular graph representation
-        mol_graph = Chem.RWMol(mol)
-        Chem.SanitizeMol(mol_graph)
-        mol_graph = Chem.RemoveHs(mol_graph)
-        adj_matrix = Chem.GetAdjacencyMatrix(mol_graph)
-        G = nx.Graph(adj_matrix)
-        
-        # Initialize the presence/absence flag
-        presence_flag = 0
-        
-        # Find all pairs of carbon and chloride atoms in the molecule
-        carbon_atoms = [atom.GetIdx() for atom in mol.GetAtoms() if atom.GetSymbol() == 'C']
-        chloride_atoms = [atom.GetIdx() for atom in mol.GetAtoms() if atom.GetSymbol() == 'Cl']
-        
-        # Check for paths of length 2 between carbon and chloride atoms
-        for carbon in carbon_atoms:
-            for chloride in chloride_atoms:
-                if carbon != chloride:
-                    try:
-                        # Use networkx shortest_path_length to check the shortest path length
-                        shortest_path_length = nx.shortest_path_length(G, source=carbon, target=chloride)
-                        if shortest_path_length == 2:
-                            presence_flag = 1
-                            break
-                    except nx.NetworkXNoPath:
-                        # No path between carbon and chloride atoms, so skip
-                        pass
-            if presence_flag == 1:
-                break
-        
-        # Append the result to the list
-        distance2.append(presence_flag)
-    
-    # Add the results as a new column in the DataFrame
-    descriptors['B02[C-Cl]'] = distance2
-    
-    return descriptors
-
-
-
-#%% Calculating molecular descriptors
-### ----------------------- ###
-
-def calc_descriptors(data, smiles_col_pos):
-    descriptors_total_list = []
-    smiles_list = []
-    t = st.empty()
+def fragment_descriptors(data, smiles_col_pos):
+     t = st.empty()
 
     # Placeholder for the spinner
     with st.spinner('CALCULATING DESCRIPTORS (STEP 1 OF 3)...'):
         # Simulate a long-running computation
         time.sleep(1)  # Sleep for 5 seconds to mimic computation
         # Loop through each molecule in the dataset
+  
+        # Create empty lists to store the results
+        results3 = []
+        results12 = []
+        results13 = []
+        results17 = []
+        results18 = []
+        molecule_counts1 = []
+        molecule_counts2 = []
+        molecule_counts4 = []
+        molecule_counts5 = []
+        molecule_counts6 = []
+        molecule_counts7 = []
+        molecule_counts8 = []
+        molecule_counts9 = []
+        molecule_counts10 = []
+        molecule_counts11 = []
+        molecule_counts14 = []
+        molecule_counts15 = []
+        molecule_counts16 = []
+        molecule_counts19 = []
+        molecule_counts20 = []
+        molecule_counts21 = []
+        molecule_counts22 = []
+    
+        # Define SMARTS patterns
+        smarts_pattern1 = Chem.MolFromSmarts('[Cl]-[*]')  #OKK
+        smarts_pattern2 = Chem.MolFromSmarts('[c;X3](c)(c)-[CH3]')  #OK
+        smarts_pattern3 = Chem.MolFromSmarts('[O]=C-[C]-O')  #OK
+        smarts_pattern4_1 = Chem.MolFromSmarts('c:c-c:c') #OK
+        smarts_pattern4_2 = Chem.MolFromSmarts('c:c:c:c') #OK
+        smarts_pattern5 = Chem.MolFromSmarts('[#6]-[#7]=[#8]')  #OK         #('[C][N+](=[O])[!H]') #('C-N=O')
+        smarts_pattern6 = Chem.MolFromSmarts('[C,c][CH3]')
+        smarts_pattern7 = Chem.MolFromSmarts('I-c:c:c') #OK           
+        smarts_pattern8 = Chem.MolFromSmarts('[C,c]:[C,c]-[F]') #OK            
+        smarts_pattern9_1 = Chem.MolFromSmarts('O-c:c-C') #OK
+        smarts_pattern9_2 = Chem.MolFromSmarts('O-c:[cH]:c') #OK
+        smarts_pattern10 = Chem.MolFromSmarts('[C,c][C;H2][C,c]') 
+        smarts_pattern11 = Chem.MolFromSmarts('S-[C,c]') #OK
+        smarts_pattern12 = Chem.MolFromSmarts('C-O-C=O') #OK
+        smarts_pattern13 = Chem.MolFromSmarts('[C](=O)(O)[C,c]') #OK
+        smarts_pattern14 = Chem.MolFromSmarts('[C;H1,H2](O)[C,c]') #OK
+        smarts_pattern15 = Chem.MolFromSmarts('Br-c:c-O') #OK
+        smarts_pattern16 = Chem.MolFromSmarts('O-[CH3]')  #OK
+        smarts_pattern17 = Chem.MolFromSmarts('[C;H1,H2](=O)[C,c]') #OK
+        smarts_pattern18 = Chem.MolFromSmarts('C=O')  #OK
+        smarts_pattern19 = Chem.MolFromSmarts('c:c-C=O') #OK
+        smarts_pattern20 = Chem.MolFromSmarts('[Br][C,c]') #OK
+        smarts_pattern21 = Chem.MolFromSmarts('N')  #OK
+        smarts_pattern22 = Chem.MolFromSmarts('Br-c:c-Br') #OK 
+    
+        
         for pos, row in data.iterrows():
-            molecule_name = row[0]  # Assuming the first column contains the molecule names
-            molecule_smiles = row[smiles_col_pos]  # Assuming the specified column contains the SMILES
-
-            if pd.isna(molecule_smiles) or molecule_smiles.strip() == '':
-                continue  # Skip to the next row if SMILES is empty
+                molecule_name = row.iloc[0]  # Assuming the first column contains the molecule names
+                molecule_smiles = row.iloc[smiles_col_pos]  # Assuming the specified column contains the SMILES
+    
+                if pd.isna(molecule_smiles) or molecule_smiles.strip() == '':
+                            continue  # Skip to the next row if SMILES is empty
+    
+                mol = Chem.MolFromSmiles(molecule_smiles)  # Convert SMILES to RDKit Mol object
+                if mol is not None:
+                    # Define substructure match logic for each pattern
+                    fragment3 = mol.HasSubstructMatch(smarts_pattern3)
+                    fragment9_1 = mol.HasSubstructMatch(smarts_pattern9_1)
+                    #Check for matches in the molecule
+                    fragment9_2 = mol.GetSubstructMatches(smarts_pattern9_2)
+                   
+                    # Filter the matches to count only unique c-O bonds
+                    filtered_matches_oc = []
+                    used_oxygen_atoms = set()  # Track oxygen atoms to ensure uniqueness
+                    
+                    for match in fragment9_2:
+                        for atom_idx in match:
+                            atom = mol.GetAtomWithIdx(atom_idx)
+                            if atom.GetSymbol() == 'O' and atom_idx not in used_oxygen_atoms:
+                                # Add the match if it contains a new oxygen
+                                filtered_matches_oc.append(match)
+                                used_oxygen_atoms.add(atom_idx)  # Mark this oxygen as used
+                                break  # Only count one c-O per match
+        
+    
+                    fragment12 = mol.HasSubstructMatch(smarts_pattern12)
+                    fragment13 = mol.HasSubstructMatch(smarts_pattern13)
+    
+    
+                    fragment15 = mol.GetSubstructMatches(smarts_pattern15)
+                    # Find non-overlapping fragments
+                    non_overlapping_matches_br_cc_o = []
+                    used_indices_br_cc_o = set()
+                    
+                    for match in fragment15:
+                        # Check if any of the indices in the current match overlap with already used indices
+                        if not any(index in used_indices_br_cc_o for index in match):
+                            # If there is no overlap, add this match to the non-overlapping list
+                            non_overlapping_matches_br_cc_o.append(match)
+                            # Mark these indices as used
+                            used_indices_br_cc_o.update(match)
+    
+                    fragment17 = mol.HasSubstructMatch(smarts_pattern17)
+                    fragment18 = mol.HasSubstructMatch(smarts_pattern18)
+    
+                    # Check for matches in the molecule
+                    fragment19 = mol.GetSubstructMatches(smarts_pattern19)
+                    
+                    # Initialize a set to track used pairs of central atoms (position 1 and 2 in the match tuple)
+                    used_central_pair_ccco = set()
+                    
+                    # Filter the matches to avoid duplicate (second, third) atom pairs
+                    filtered_matches_ccco = []
+                    for match in fragment19:
+                        central_pair = (match[1], match[2])  # Second and third atoms (central pair)
+                        
+                        # Only keep the match if the pair hasn't been used yet
+                        if central_pair not in used_central_pair:
+                            filtered_matches_ccco.append(match)
+                            # Mark the pair as used
+                            used_central_pair_ccco.add(central_pair)
+    
+                    # Check for matches in the molecule
+                    fragment22 = mol.GetSubstructMatches(smarts_pattern22)
             
-            mol = Chem.MolFromSmiles(molecule_smiles)
-            if mol is not None:
-                smiles_ionized = charges_ph(molecule_smiles, 7.4)
-                smile_checked = smile_obabel_corrector(smiles_ionized)
-                #smile_checked = smiles_ionized
-                smile_final = smile_checked.rstrip()
-                smiles_list.append(smile_final)
-                
-                calc = Calculator(descriptors, ignore_3D=True)
-                descriptor_values = calc(mol).asdict()
-                
-                # Create a dictionary with molecule name as key and descriptor values as values
-                descriptors_dict = {'NAME': molecule_name}
-                descriptors_dict.update(descriptor_values)
-                
-                descriptors_total_list.append(descriptors_dict)
-                #t.markdown("CALCULATING DESCRIPTORS FOR MOLECULE: " + str(pos +1) +"/" + str(len(data.iloc[:,0])))
+                    # Find non-overlapping fragments
+                    non_overlapping_matches_br = []
+                    used_indices_br = set()
+                    
+                    for match in fragment22:
+                    # Check if any of the indices in the current match overlap with already used indices
+                        if not any(index in used_indices for index in match):
+                            # If there is no overlap, add this match to the non-overlapping list
+                            non_overlapping_matches_br.append(match)
+                            # Mark these indices as used
+                            used_indices_br.update(match)
     
-        # Convert the list of dictionaries to a DataFrame
-        descriptors_total = pd.DataFrame(descriptors_total_list)
-        descriptors_total = descriptors_total.set_index('NAME', inplace=False).copy()
-        descriptors_total = descriptors_total.reindex(sorted(descriptors_total.columns), axis=1)   
-        descriptors_total.replace([np.inf, -np.inf], np.nan, inplace=True)
-        descriptors_total["Smiles_OK"] = smiles_list
-    
-        # Perform formal charge calculation
-        descriptors_total = formal_charge_calculation(descriptors_total)
-
-        # Perform B04[O-O] descriptor calculation
-        descriptors_total = check_oo_distance(descriptors_total)
-
-        # Perform nN=C-N< descriptor calculation
-        descriptors_total = count_amidine_groups(descriptors_total)
-
-        #Perform B07[Cl-Cl] descriptor calculation
-        descriptors_total = check_clcl_distance(descriptors_total)
-
-        #Perform T(Cl..Cl) descriptor calculation
-        descriptors_total = sum_all_cl_cl_distances(descriptors_total)
-
-        #Perform nN(CO)2 descriptor calculation
-        descriptors_total = count_imide_groups(descriptors_total)
-
-        #Perform B02[C-Cl] molecular descriptor calculation
-        descriptors_total = check_clc_distance(descriptors_total)
-
-        #Perform C-033 molecular descriptor calculation
-        descriptors_total = count_rcx(descriptors_total)
-    
-        #Perform F02[N-S] molecular descriptor calculation
-        descriptors_total = check_ns_distance(descriptors_total)
+                    
         
-        #Perform B02[N-O] molecular descriptor calculation
-        descriptors_total =  check_2no_distance(descriptors_total)
+                            # Count the occurrences of smarts_pattern4 in the molecule
+                    count_in_molecule1 = len(mol.GetSubstructMatches(smarts_pattern1))
+                    count_in_molecule2 = len(mol.GetSubstructMatches(smarts_pattern2))
+            
+                    count_in_molecule4_1 = len(mol.GetSubstructMatches(smarts_pattern4_1))/4
+                    count_in_molecule4_2 = len(mol.GetSubstructMatches(smarts_pattern4_2))/2
+            
+                    # Check for rings
+                    ring_info = mol.GetRingInfo()
+                    rings = ring_info.AtomRings()  # List of rings
+                    
+                    # Check if there are two rings and if they are connected
+                    connected = False
+                    if len(rings) >= 2:  # Check if there are at least two rings
+                        # Convert ring atom indices to sets
+                        ring1_atoms = set(rings[0])  # First ring's atoms
+                        for i in range(1, len(rings)):
+                            ring2_atoms = set(rings[i])  # Current ring's atoms
+                            # Check for intersection (shared atoms)
+                            if ring1_atoms.intersection(ring2_atoms):
+                                connected = True
+                                break
+                    
+                    # Adjust count1 if two rings are connected
+                    if connected:
+                        count_in_molecule4_2 -= 2
+                        
+                    count_in_molecule4 = count_in_molecule4_1 + count_in_molecule4_2
+                    count_in_molecule5 = len(mol.GetSubstructMatches(smarts_pattern5))
+                    count_in_molecule6 = len(mol.GetSubstructMatches(smarts_pattern6))
+                    count_in_molecule7 = len(mol.GetSubstructMatches(smarts_pattern7))/2
+                    count_in_molecule8 = len(mol.GetSubstructMatches(smarts_pattern8))/2
+                    count_in_molecule9_1 = len(mol.GetSubstructMatches(smarts_pattern9_1))
+                    count_in_molecule9_2 = len(filtered_matches_oc)
+                    count_in_molecule9 = count_in_molecule9_1 + count_in_molecule9_2
+                    count_in_molecule10 = len(mol.GetSubstructMatches(smarts_pattern10))
+                    count_in_molecule11 = len(mol.GetSubstructMatches(smarts_pattern11))
+                    count_in_molecule14 = len(mol.GetSubstructMatches(smarts_pattern14))
+                    count_in_molecule15 = len(non_overlapping_matches_br_cc_o)
+                    count_in_molecule16 = len(mol.GetSubstructMatches(smarts_pattern16))
+                    count_in_molecule19 = len(filtered_matches_ccco)/2
+                    count_in_molecule20 = len(mol.GetSubstructMatches(smarts_pattern20))
+                    count_in_molecule21 = len(mol.GetSubstructMatches(smarts_pattern21))
+                    count_in_molecule22 = len(non_overlapping_matches_br)
         
-        #Perform B04[O-Cl] molecular descriptor calculation
-        descriptors_total = check_4ocl_distance(descriptors_total)
+                    # Append the results for each fragment pattern to respective lists
+                    
+                    results3.append(int(fragment3))
+                    results12.append(int(fragment12))
+                    results13.append(int(fragment13))
+                    results17.append(int(fragment17)) 
+                    results18.append(int(fragment18))
+                
+                    molecule_counts1.append(int(count_in_molecule1))
+                    molecule_counts2.append(int(count_in_molecule2))
+                    molecule_counts4.append(int(count_in_molecule4))
+                    molecule_counts5.append(int(count_in_molecule5))
+                    molecule_counts6.append(int(count_in_molecule6))
+                    molecule_counts7.append(int(count_in_molecule7))
+                    molecule_counts8.append(int(count_in_molecule8))
+                    molecule_counts9.append(int(count_in_molecule9))
+                    molecule_counts10.append(int(count_in_molecule10))
+                    molecule_counts11.append(int(count_in_molecule11))
+                    molecule_counts14.append(int(count_in_molecule14))
+                    molecule_counts15.append(int(count_in_molecule15))
+                    molecule_counts16.append(int(count_in_molecule16))
+                    molecule_counts19.append(int(count_in_molecule19))
+                    molecule_counts20.append(int(count_in_molecule20))
+                    molecule_counts21.append(int(count_in_molecule21))
+                    molecule_counts22.append(int(count_in_molecule22))
+    
+    
+            # Create a DataFrame to store the results
+        df_fragments = pd.DataFrame({
+            
+            'Cl-C': molecule_counts1, 
+            '(C=C),(C-C),(C-C),xC': molecule_counts2,
+            'O=C-C-O': results3,
+            'C=C-C=C': molecule_counts4,
+            'C-N=O': molecule_counts5,
+            '(C-C),xC': molecule_counts6,
+            'I-C-C=C': molecule_counts7,
+            'C-C-F': molecule_counts8,
+            'C-C=C-O': molecule_counts9,
+            '(C-C),(C-C),xC' : molecule_counts10,
+            'S-C': molecule_counts11,
+            'C-O-C=O' : results12,
+            '(C=O),(C-C),(C-O),xC' : results13,
+            '(C-C),(C-O),xC' : molecule_counts14,
+            'Br-C-C-O': molecule_counts15,
+            '(C-O),xC': molecule_counts16,
+            '(C=O),(C-C),xC': results17,    
+            'C=O': results18,
+            'C=C-C=O' : molecule_counts19,
+            '(Br-C),xBr': molecule_counts20,
+            'N' : molecule_counts21,
+            'Br-C=C-Br': molecule_counts22,
+            
+        })
+    
+        
+    
+        return df_fragments, smiles_list
 
-         #Perform B08[C-O] molecular descriptor calculation
-        descriptors_total = check_8co_distance(descriptors_total)
-
-         #Perform B09[C-S] molecular descriptor calculation
-        descriptors_total = check_9cs_distance(descriptors_total)
-
-        #Perform B07[C-C] molecular descriptor calculation
-        descriptors_total = check_7cc_distance(descriptors_total)
-
-        #Perform F09[C-N] descriptor calculation
-        descriptors_total = check_7cn_distance(descriptors_total)
-
-        #Perform H-051 descriptor calculation
-        descriptors_total = calculate_h051(descriptors_total)
 
         return descriptors_total, smiles_list
 
