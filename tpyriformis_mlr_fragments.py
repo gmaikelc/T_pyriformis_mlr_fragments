@@ -798,16 +798,17 @@ if uploaded_file_1 is not None:
        
         figure  = williams_plot(leverage_train, leverage_test, std_residual_train, std_residual_test,id_list_1)
          
-        col1, = st.columns(1)
+        col1,col2 = st.columns(2)
 
         with col1:
             st.header("Tetrahymena pyriformis",divider='blue')
             st.subheader(r'Predictions')
             st.write(styled_df)
+        with col2:
             st.markdown("<h2 style='text-align: center; font-size: 30px;'>William's Plot (Applicability Domain)</h2>", unsafe_allow_html=True)
             st.plotly_chart(figure,use_container_width=True)
-            st.markdown(":point_down: **Here you can download the results for T. pyriformis MLR model**", unsafe_allow_html=True,)
-            st.markdown(filedownload1(final_file), unsafe_allow_html=True)
+        st.markdown(":point_down: **Here you can download the results for T. pyriformis MLR model**", unsafe_allow_html=True,)
+        st.markdown(filedownload1(final_file), unsafe_allow_html=True)
     
        
 
@@ -822,39 +823,31 @@ else:
         
         # Calculate descriptors and SMILES for the first data
         descriptors_total_1, smiles_list_1 = calc_descriptors(data, 1)
-    
-
-        
-                 
+             
         #Selecting the descriptors based on model for salt water component
         test_data1, id_list_1 =  reading_reorder(descriptors_total_1,loaded_desc)
-        
- 
 
-        
         X_final2= test_data1
         
-        
         df_train_normalized, df_test_normalized = normalize_data(train_data, X_final2)
-      
         
         final_file, styled_df,leverage_train,std_residual_train, leverage_test, std_residual_test= predictions(loaded_model, loaded_desc, df_test_normalized)
-        
         
         x_lim_max_std, x_lim_min_std, h_critical, x_lim_max_lev, x_lim_min_lev = calculate_wp_plot_limits(leverage_train,std_residual_train, x_std_max=4, x_std_min=-4)
         
         figure  = williams_plot(leverage_train, leverage_test, std_residual_train, std_residual_test,id_list_1)
     
-        col1 = st.columns(1)
+        col1,col2 = st.columns(2)
 
         with col1:
-            st.header("Salt Water",divider='blue')
+            st.header("T. pyriformis",divider='blue')
             st.subheader(r'Predictions')
-            st.write(styled_df)
+            st.write(styled_df
+        with col2:
             st.markdown("<h2 style='text-align: center; font-size: 30px;'>William's Plot (Applicability Domain)</h2>", unsafe_allow_html=True)
             st.plotly_chart(figure,use_container_width=True)
-            st.markdown(":point_down: **Here you can download the results for Salt Water model**", unsafe_allow_html=True,)
-            st.markdown(filedownload1(final_file), unsafe_allow_html=True)
+        st.markdown(":point_down: **Here you can download the results for T. pyriformis model**", unsafe_allow_html=True,)
+        st.markdown(filedownload1(final_file), unsafe_allow_html=True)
 
 
 
@@ -894,16 +887,17 @@ if on2:
         
         figure  = williams_plot(leverage_train, leverage_test, std_residual_train, std_residual_test,id_list_1)
         
-        col1 = st.columns(1)
+        col1,col2 = st.columns(2)
 
         with col1:
-            st.header("Salt Water",divider='blue')
+            st.header("T. pyriformis",divider='blue')
             st.subheader(r'Predictions')
             st.write(styled_df)
+        with col2:
             st.markdown("<h2 style='text-align: center; font-size: 30px;'>William's Plot (Applicability Domain)</h2>", unsafe_allow_html=True)
             st.plotly_chart(figure,use_container_width=True)
-            st.markdown(":point_down: **Here you can download the results for Salt Water model**", unsafe_allow_html=True,)
-            st.markdown(filedownload1(final_file), unsafe_allow_html=True)
+        st.markdown(":point_down: **Here you can download the results for T. pyriformis model**", unsafe_allow_html=True,)
+        st.markdown(filedownload1(final_file), unsafe_allow_html=True)
 
 #Footer edit
 
