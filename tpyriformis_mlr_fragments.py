@@ -856,6 +856,8 @@ else:
 
         # Display the top molecule with each SMARTS highlighted in separate images
         #st.markdown("<h2 style='text-align: center; font-size: 20px;'>Molecule with Highlighted Substructures)</h2>", unsafe_allow_html=True)
+        im = Draw.MolToImage(Chem.MolFromSmiles('CCCC(C)CC1=CC=C(CCC)C(CCC)=C1'),fitImage=True)
+        st.image(im)
 
         # Iterate over the first 5 rows of the dataframe
         for index, row in data.head(5).iterrows():
