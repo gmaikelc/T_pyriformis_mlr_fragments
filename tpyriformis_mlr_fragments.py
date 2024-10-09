@@ -886,7 +886,6 @@ if on2:
         X_final2= test_data1
  
         df_train_normalized, df_test_normalized = normalize_data(train_data, X_final2)
-        df_train_normalized2, df_test_normalized2 = normalize_data2(train_data2, X_final4)
         #st.markdown(filedownload5(df_test_normalized), unsafe_allow_html=True)
         
         final_file, styled_df,leverage_train,std_residual_train, leverage_test, std_residual_test= predictions(loaded_model, loaded_desc, df_test_normalized)
