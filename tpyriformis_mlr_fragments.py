@@ -773,10 +773,10 @@ def filedownload1(df):
 
 #%% RUN
 
-data_train = pd.read_csv("data/" + "data_Tpyriformis_22var_original_training.csv")
-mean_value = data_train['pLC50'].mean()
-loaded_model = pickle.load(open("models/" + "ml_model_tetrahymena_pyriformis_structural.pickle", 'rb'))
-loaded_desc = pickle.load(open("models/" + "ml_descriptor_tetrahymena_pyriformis_structural.pickle", 'rb'))
+#data_train = pd.read_csv("data/" + "data_Tpyriformis_22var_original_training.csv")
+#mean_value = data_train['pLC50'].mean()
+#loaded_model = pickle.load(open("models/" + "ml_model_tetrahymena_pyriformis_structural.pickle", 'rb'))
+#loaded_desc = pickle.load(open("models/" + "ml_descriptor_tetrahymena_pyriformis_structural.pickle", 'rb'))
 
 
 
@@ -792,21 +792,12 @@ if uploaded_file_1 is not None:
         
         # Calculate descriptors and SMILES for the first data
         descriptors_total_1, smiles_list_1 = calc_descriptors(data, 1)
-     
-
-        
+             
                  
         #Selecting the descriptors based on model for salt water component
         test_data1, id_list_1 =  reading_reorder(descriptors_total_1,loaded_desc)
-      
- 
-        # Save DataFrame as CSV
-        #csv = test_data1.to_csv(index=False)
-
-                                
         
         X_final2= test_data1
-      
         
         df_train_normalized, df_test_normalized = normalize_data(train_data, X_final2)
       
