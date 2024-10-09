@@ -853,13 +853,13 @@ else:
             st.subheader(r'Predictions')
             st.write(styled_df)
         with col2:
-            st.markdown("<h2 style='text-align: center; font-size: 30px;'>William's Plot (Applicability Domain)</h2>", unsafe_allow_html=True)
+            st.markdown("<h2 style='text-align: center; font-size: 25px;'>William's Plot (Applicability Domain)</h2>", unsafe_allow_html=True)
             st.plotly_chart(figure,use_container_width=True)
         st.markdown(":point_down: **Here you can download the results for T. pyriformis MLR model**", unsafe_allow_html=True,)
         st.markdown(filedownload1(final_file), unsafe_allow_html=True)
 
         # Display the top molecule with each SMARTS highlighted in separate images
-        st.title("Molecule with Highlighted Substructures")
+        st.markdown("<h2 style='text-align: center; font-size: 20px;'>"Molecule with Highlighted Substructures")</h2>", unsafe_allow_html=True)
 
         # Iterate over the first 5 rows of the dataframe
         for index, row in data.head(5).iterrows():
