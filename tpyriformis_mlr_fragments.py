@@ -809,7 +809,9 @@ if uploaded_file_1 is not None:
         col1, col2 = st.columns(2)
 
         with col1:
-            st.header("Tetrahymena pyriformis",divider='blue')
+            st.header("T. pyriformis")
+            st.markdown("<hr style='border: 1px solid blue;'>", unsafe_allow_html=True)
+            #st.header("Tetrahymena pyriformis",divider='blue')
             st.subheader(r'Predictions')
             st.write(styled_df)
         with col2:
@@ -850,7 +852,9 @@ else:
         col1, col2 = st.columns(2)
 
         with col1:
-            st.header("Tetrahymena pyriformis",divider='blue')
+            st.header("T. pyriformis")
+            st.markdown("<hr style='border: 1px solid blue;'>", unsafe_allow_html=True)
+            #st.header("Tetrahymena pyriformis",divider='blue')
             st.subheader(r'Predictions')
             st.write(styled_df)
         with col2:
@@ -924,7 +928,9 @@ if on2:
         col1,col2 = st.columns(2)
 
         with col1:
-            st.header("T. pyriformis",divider='blue')
+            st.header("T. pyriformis")
+            st.markdown("<hr style='border: 1px solid blue;'>", unsafe_allow_html=True)
+            #st.header("T. pyriformis",divider='blue')
             st.subheader(r'Predictions')
             st.write(styled_df)
         with col2:
