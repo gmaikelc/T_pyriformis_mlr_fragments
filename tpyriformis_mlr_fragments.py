@@ -42,6 +42,8 @@ import base64
 from rdkit.Chem import Draw, rdDepictor
 from rdkit.Chem.Draw import rdMolDraw2D
 
+from typing import Dict, Tuple, List
+
 from rdkit import Chem, RDConfig
 from rdkit.Chem import AllChem, rdFingerprintGenerator, Descriptors, Draw
 from rdkit.Chem.MolStandardize import rdMolStandardize
@@ -621,20 +623,113 @@ def filedownload1(df: pd.DataFrame):
     return href
 
 # ============== Highlight substructure images =========
-def generate_molecule_image(smiles, highlight_mol, color=(1,0,0), mol_size=(300,300)):
+
+RED   = (1.00, 0.00, 0.00)
+GREEN = (0.00, 0.60, 0.00)
+
+def _find_fragment_matches(mol: Chem.Mol, smarts: str) -> List[Tuple[int, ...]]:
+    patt = Chem.MolFromSmarts(smarts)
+    if not patt:
+        return []
+    return list(mol.GetSubstructMatches(patt))
+
+def _atoms_bonds_from_match(mol: Chem.Mol, match: Tuple[int, ...]):
+    """Return atoms and bonds (idx lists) that belong to this substructure match."""
+    aset = set(match)
+    bonds = []
+    for b in mol.GetBonds():
+        i, j = b.GetBeginAtomIdx(), b.GetEndAtomIdx()
+        if i in aset and j in aset:
+            bonds.append(b.GetIdx())
+    return list(aset), bonds
+
+def make_fragment_grid(
+    smiles: str,
+    fragment_effect_map: Dict[str, Tuple[str, int]],
+    per_row: int = 3,
+    tile_size: Tuple[int, int] = (260, 260),
+    highlight_all_occurrences: bool = True,
+):
+    """
+    Repeat the molecule in a grid. Each tile highlights ONE fragment.
+    fragment_effect_map: { 'DescriptorName': ('SMARTS', +1 or -1) }
+        +1 -> red (increases toxicity), -1 -> green (decreases toxicity)
+    """
     mol = Chem.MolFromSmiles(smiles)
     if not mol:
         return None
-    rdDepictor.Compute2DCoords(mol)
-    drawer = rdMolDraw2D.MolDraw2DCairo(mol_size[0], mol_size[1])
-    match = mol.GetSubstructMatch(highlight_mol)
-    highlight_atoms = list(match) if match else []
-    highlight_colors = {idx: color for idx in highlight_atoms}
-    drawer.DrawMolecule(mol, highlightAtoms=highlight_atoms, highlightAtomColors=highlight_colors)
-    drawer.FinishDrawing()
-    png_data = drawer.GetDrawingText()
-    img = Image.open(io.BytesIO(png_data))
+
+    # 2D coords for consistent layout
+    Chem.rdDepictor.Compute2DCoords(mol)
+
+    mols = []
+    legends = []
+    highlightAtomLists = []
+    highlightBondLists = []
+    highlightAtomColors = []
+    highlightBondColors = []
+
+    for name, (smarts, effect) in fragment_effect_map.items():
+        if not smarts:
+            continue
+        matches = _find_fragment_matches(mol, smarts)
+        if not matches:
+            # still show a tile (gray) so reader knows fragment was absent
+            mols.append(mol)
+            legends.append(f"{name}  (no hit)")
+            highlightAtomLists.append([])
+            highlightBondLists.append([])
+            highlightAtomColors.append({})
+            highlightBondColors.append({})
+            continue
+
+        color = RED if effect >= 0 else GREEN
+
+        if highlight_all_occurrences:
+            # highlight ALL occurrences of this fragment in the tile
+            atoms_all, bonds_all = set(), set()
+            for m in matches:
+                a_idxs, b_idxs = _atoms_bonds_from_match(mol, m)
+                atoms_all.update(a_idxs)
+                bonds_all.update(b_idxs)
+            a_list = list(atoms_all)
+            b_list = list(bonds_all)
+            a_colors = {i: color for i in a_list}
+            b_colors = {i: color for i in b_list}
+
+            mols.append(mol)
+            legends.append(name)
+            highlightAtomLists.append(a_list)
+            highlightBondLists.append(b_list)
+            highlightAtomColors.append(a_colors)
+            highlightBondColors.append(b_colors)
+        else:
+            # one tile per occurrence (can explode the grid)
+            for k, m in enumerate(matches, 1):
+                a_idxs, b_idxs = _atoms_bonds_from_match(mol, m)
+                a_colors = {i: color for i in a_idxs}
+                b_colors = {i: color for i in b_idxs}
+                mols.append(mol)
+                legends.append(f"{name}  (hit {k})")
+                highlightAtomLists.append(a_idxs)
+                highlightBondLists.append(b_idxs)
+                highlightAtomColors.append(a_colors)
+                highlightBondColors.append(b_colors)
+
+    # Build the grid
+    img = Draw.MolsToGridImage(
+        mols,
+        molsPerRow=per_row,
+        subImgSize=tile_size,
+        legends=legends,
+        useSVG=False,
+        highlightAtomLists=highlightAtomLists,
+        highlightBondLists=highlightBondLists,
+        highlightAtomColors=highlightAtomColors,
+        highlightBondColors=highlightBondColors,
+    )
     return img
+
 
 # ============== Load model & descriptors ==============
 data_train = pd.read_csv("data/" + "data_Tpyriformis_22var_original_training.csv")
@@ -868,6 +963,7 @@ text-align: center;
 </div>
 """
 st.markdown(footer,unsafe_allow_html=True)
+
 
 
 
