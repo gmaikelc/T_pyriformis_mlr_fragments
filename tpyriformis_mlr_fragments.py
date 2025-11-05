@@ -103,30 +103,6 @@ with st.expander("**Workflow**"):
     image = Image.open('toc.png')
     st.image(image, caption='Fragment-based Tetrahymena Ecotoxicity workflow')
 
-# tpyriformis_app.py  — Streamlit
-import base64, io, time, pickle
-import numpy as np
-import pandas as pd
-import streamlit as st
-
-from rdkit import Chem
-from rdkit.Chem import rdDepictor, rdMolDraw2D, Draw
-from PIL import Image
-
-# If you use molvs
-try:
-    from molvs import Standardizer
-except Exception:
-    Standardizer = None
-
-# If you use OpenBabel (optional)
-try:
-    from openbabel import openbabel
-except Exception:
-    openbabel = None
-
-# Plotly
-import plotly.graph_objects as go
 
 # ============== Sidebar (file upload) ==================
 st.sidebar.header('Upload your CSV file')
@@ -867,4 +843,5 @@ text-align: center;
 </div>
 """
 st.markdown(footer,unsafe_allow_html=True)
+
 
