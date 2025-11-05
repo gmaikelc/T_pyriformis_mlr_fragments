@@ -806,7 +806,21 @@ if on2:
         
         x_lim_max_std, x_lim_min_std, h_critical, x_lim_max_lev, x_lim_min_lev = calculate_wp_plot_limits(leverage_train,std_residual_train, x_std_max=4, x_std_min=-4)
         
-        figure  = williams_plot(leverage_train, leverage_test, std_residual_train, std_residual_test,id_list_1)
+        #figure  = williams_plot(leverage_train, leverage_test, std_residual_train, std_residual_test,id_list_1)
+
+        figure = williams_plot(
+             leverage_train,
+             leverage_test,
+             std_residual_train,
+             std_residual_test,
+             id_list_1,
+             x_lim_max_std,
+             x_lim_min_std,
+             h_critical,
+             x_lim_max_lev,
+             x_lim_min_lev
+        )
+
         
         col1,col2 = st.columns(2)
 
@@ -854,6 +868,7 @@ text-align: center;
 </div>
 """
 st.markdown(footer,unsafe_allow_html=True)
+
 
 
 
