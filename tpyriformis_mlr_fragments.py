@@ -651,7 +651,9 @@ FRAGMENT_EFFECTS = {
 
 RED   = (1.00, 0.00, 0.00)
 GREEN = (0.00, 0.60, 0.00)
-
+def _tox_phrase(sign: int) -> str:
+    return "tox increase" if sign >= 0 else "tox decrease"
+    
 def _find_fragment_matches(mol: Chem.Mol, smarts: str) -> List[Tuple[int, ...]]:
     patt = Chem.MolFromSmarts(smarts)
     if not patt:
@@ -670,7 +672,7 @@ def _atoms_bonds_from_match(mol: Chem.Mol, match: Tuple[int, ...]):
 def make_fragment_grid_for_molecule(
     smiles: str,
     fragment_effects: Dict[str, Tuple[str, int, float]],
-    per_row: int = 3,
+    per_row: int = 5,
     tile_size=(260, 260),
     highlight_all_occurrences: bool = True,
     sort_by_magnitude: bool = True,
@@ -722,7 +724,7 @@ def make_fragment_grid_for_molecule(
             b_colors = {i: color for i in b_list}
 
             mols.append(mol)
-            legends.append(f"{label} (|β|={mag:.3g})")
+            legends.append(f"{label} (tox {mag})")
             highlightAtomLists.append(a_list)
             highlightBondLists.append(b_list)
             highlightAtomColors.append(a_colors)
@@ -736,7 +738,8 @@ def make_fragment_grid_for_molecule(
                 a_colors = {i: color for i in a_idxs}
                 b_colors = {i: color for i in b_idxs}
                 mols.append(mol)
-                legends.append(f"{label} (hit {k}, |β|={mag:.3g})")
+                legends.append(f"{label} ({_tox_phrase(eff)})")
+                #legends.append(f"{label} (hit {k}, |β|={mag:.3g})")
                 highlightAtomLists.append(a_idxs)
                 highlightBondLists.append(b_idxs)
                 highlightAtomColors.append(a_colors)
@@ -1004,4 +1007,5 @@ text-align: center;
 </div>
 """
 st.markdown(footer,unsafe_allow_html=True)
+
 
