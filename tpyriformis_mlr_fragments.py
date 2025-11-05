@@ -623,6 +623,31 @@ def filedownload1(df: pd.DataFrame):
     return href
 
 # ============== Highlight substructure images =========
+FRAGMENT_EFFECTS = {
+  'Cl-C': ('[Cl]-[*]', 1, 0.461),
+ '(C=C),(C-C),(C-C),xC': ('[c;X3](c)(c)-[CH3]', -1, 0.24),
+ 'O=C-C-O': ('[O]=C-[C]-O', 1, 1.1),
+ 'C=C-C=C': ('c:c-c:c', 1, 0.408),
+ 'C-N=O': ('[#6]-[#7]=[#8]', 1, 0.328),
+ '(C-C),xC': ('[C,c][CH3]', 1, 0.385),
+ 'I-C-C=C': ('I-c:c:c', 1, 0.847),
+ 'C-C-F': ('[C,c]:[C,c]-[F]', 1, 0.324),
+ 'C-C=C-O': ('O-c:c-C', 1, 0.156),
+ '(C-C),(C-C),xC': ('[C,c][C;H2][C,c]', 1, 0.316),
+ 'S-C': ('S-[C,c]', -1, 1.684),
+ 'C-O-C=O': ('C-O-C=O', 1, 1.562),
+ '(C=O),(C-C),(C-O),xC': ('[C](=O)(O)[C,c]', -1, 0.645),
+ '(C-C),(C-O),xC': ('[C;H1,H2](O)[C,c]', -1, 0.324),
+ 'Br-C-C-O': ('Br-c:c-O', 1, 0.293),
+ '(C-O),xC': ('O-[CH3]', 1, 0.141),
+ '(C=O),(C-C),xC': ('[C;H1,H2](=O)[C,c]', 1, 0.652),
+ 'C=O': ('C=O', -1, 0.916),
+ 'C=C-C=O': ('c:c-C=O', 1, 0.603),
+ '(Br-C),xBr': ('[Br][C,c]', 1, 0.71),
+ 'N': ('N', 1, 0.168),
+ 'Br-C=C-Br': ('Br-c:c-Br', -1, 0.516)
+}
+
 
 RED   = (1.00, 0.00, 0.00)
 GREEN = (0.00, 0.60, 0.00)
@@ -634,7 +659,6 @@ def _find_fragment_matches(mol: Chem.Mol, smarts: str) -> List[Tuple[int, ...]]:
     return list(mol.GetSubstructMatches(patt))
 
 def _atoms_bonds_from_match(mol: Chem.Mol, match: Tuple[int, ...]):
-    """Return atoms and bonds (idx lists) that belong to this substructure match."""
     aset = set(match)
     bonds = []
     for b in mol.GetBonds():
@@ -643,50 +667,50 @@ def _atoms_bonds_from_match(mol: Chem.Mol, match: Tuple[int, ...]):
             bonds.append(b.GetIdx())
     return list(aset), bonds
 
-def make_fragment_grid(
+def make_fragment_grid_for_molecule(
     smiles: str,
-    fragment_effect_map: Dict[str, Tuple[str, int]],
+    fragment_effects: Dict[str, Tuple[str, int, float]],
     per_row: int = 3,
-    tile_size: Tuple[int, int] = (260, 260),
+    tile_size=(260, 260),
     highlight_all_occurrences: bool = True,
+    sort_by_magnitude: bool = True,
 ):
     """
-    Repeat the molecule in a grid. Each tile highlights ONE fragment.
-    fragment_effect_map: { 'DescriptorName': ('SMARTS', +1 or -1) }
-        +1 -> red (increases toxicity), -1 -> green (decreases toxicity)
+    Repeat the SAME molecule in a grid; each tile highlights ONE fragment
+    with ALL its occurrences (if highlight_all_occurrences=True).
+
+    fragment_effects: {label: (smarts, effect_sign, coef_abs)}
+        effect_sign: +1 -> red (↑tox), -1 -> green (↓tox)
+        coef_abs: |coefficient| used for optional sorting by importance
     """
     mol = Chem.MolFromSmiles(smiles)
     if not mol:
         return None
-
-    # 2D coords for consistent layout
     Chem.rdDepictor.Compute2DCoords(mol)
 
-    mols = []
-    legends = []
-    highlightAtomLists = []
-    highlightBondLists = []
-    highlightAtomColors = []
-    highlightBondColors = []
+    # optional: sort tiles by |coef| descending
+    items = list(fragment_effects.items())
+    if sort_by_magnitude:
+        items.sort(key=lambda kv: kv[1][2], reverse=True)
 
-    for name, (smarts, effect) in fragment_effect_map.items():
-        if not smarts:
-            continue
+    mols, legends = [], []
+    highlightAtomLists, highlightBondLists = [], []
+    highlightAtomColors, highlightBondColors = [], []
+
+    for label, (smarts, eff, mag) in items:
         matches = _find_fragment_matches(mol, smarts)
+        color = RED if eff >= 0 else GREEN
         if not matches:
-            # still show a tile (gray) so reader knows fragment was absent
+            # still display tile so users see "no hit"
             mols.append(mol)
-            legends.append(f"{name}  (no hit)")
+            legends.append(f"{label} (no hit)")
             highlightAtomLists.append([])
             highlightBondLists.append([])
             highlightAtomColors.append({})
             highlightBondColors.append({})
             continue
 
-        color = RED if effect >= 0 else GREEN
-
         if highlight_all_occurrences:
-            # highlight ALL occurrences of this fragment in the tile
             atoms_all, bonds_all = set(), set()
             for m in matches:
                 a_idxs, b_idxs = _atoms_bonds_from_match(mol, m)
@@ -698,25 +722,26 @@ def make_fragment_grid(
             b_colors = {i: color for i in b_list}
 
             mols.append(mol)
-            legends.append(name)
+            legends.append(f"{label} (|β|={mag:.3g})")
             highlightAtomLists.append(a_list)
             highlightBondLists.append(b_list)
             highlightAtomColors.append(a_colors)
             highlightBondColors.append(b_colors)
         else:
-            # one tile per occurrence (can explode the grid)
-            for k, m in enumerate(matches, 1):
+            # one tile per individual occurrence (can create many tiles)
+            k = 0
+            for m in matches:
+                k += 1
                 a_idxs, b_idxs = _atoms_bonds_from_match(mol, m)
                 a_colors = {i: color for i in a_idxs}
                 b_colors = {i: color for i in b_idxs}
                 mols.append(mol)
-                legends.append(f"{name}  (hit {k})")
+                legends.append(f"{label} (hit {k}, |β|={mag:.3g})")
                 highlightAtomLists.append(a_idxs)
                 highlightBondLists.append(b_idxs)
                 highlightAtomColors.append(a_colors)
                 highlightBondColors.append(b_colors)
 
-    # Build the grid
     img = Draw.MolsToGridImage(
         mols,
         molsPerRow=per_row,
@@ -729,6 +754,7 @@ def make_fragment_grid(
         highlightBondColors=highlightBondColors,
     )
     return img
+
 
 
 # ============== Load model & descriptors ==============
@@ -928,6 +954,21 @@ if on2:
         with col2:
             st.markdown("<h2 style='text-align: center; font-size: 30px;'>William's Plot (Applicability Domain)</h2>", unsafe_allow_html=True)
             st.plotly_chart(figure,use_container_width=True)
+            # === Fragment Grid for the DRAWN molecule ===
+        st.markdown("### Fragment grid (same molecule per tile; red ↑tox, green ↓tox)")
+        grid_img = make_fragment_grid_for_molecule(
+            smiles_list,            # the drawn SMILES string
+            FRAGMENT_EFFECTS,       # built from your coefficients
+            per_row=3,
+            tile_size=(260, 260),
+            highlight_all_occurrences=True,
+            sort_by_magnitude=True
+        )
+        if grid_img is not None:
+            st.image(grid_img, caption="Each tile highlights a single model fragment")
+        else:
+            st.info("Could not parse the drawn SMILES.")
+
         st.markdown(":point_down: **Here you can download the results for T. pyriformis model**", unsafe_allow_html=True,)
         st.markdown(filedownload1(final_file), unsafe_allow_html=True)
 
@@ -963,10 +1004,4 @@ text-align: center;
 </div>
 """
 st.markdown(footer,unsafe_allow_html=True)
-
-
-
-
-
-
 
