@@ -103,110 +103,169 @@ with st.expander("**Workflow**"):
     image = Image.open('toc.png')
     st.image(image, caption='Fragment-based Tetrahymena Ecotoxicity workflow')
 
+# tpyriformis_app.py  — Streamlit
+import base64, io, time, pickle
+import numpy as np
+import pandas as pd
+import streamlit as st
 
-#---------------------------------#
-# Sidebar - Collects user input features into dataframe
+from rdkit import Chem
+from rdkit.Chem import rdDepictor, rdMolDraw2D, Draw
+from PIL import Image
+
+# If you use molvs
+try:
+    from molvs import Standardizer
+except Exception:
+    Standardizer = None
+
+# If you use OpenBabel (optional)
+try:
+    from openbabel import openbabel
+except Exception:
+    openbabel = None
+
+# Plotly
+import plotly.graph_objects as go
+
+# ============== Sidebar (file upload) ==================
 st.sidebar.header('Upload your CSV file')
 st.sidebar.markdown("""
-[Example CSV input file](https://raw.githubusercontent.com/gmaikelc/T_pyriformis_mlr_fragments/main/virtual_smi_example.csv) 
+[Example CSV input file](https://raw.githubusercontent.com/gmaikelc/T_pyriformis_mlr_fragments/main/virtual_smi_example.csv)
 """)
+uploaded_file_1 = st.sidebar.file_uploader(
+    "Upload a CSV file with SMILES and fractions", type=["csv"]
+)
 
-uploaded_file_1 = st.sidebar.file_uploader("Upload a CSV file with SMILES and fractions", type=["csv"])
-
-
-#%% Standarization by MOLVS ####
-####---------------------------------------------------------------------------####
-
-def standardizer(df,pos):
-    s = Standardizer()
-    molecules = df[pos].tolist()
-    standardized_molecules = []
-    smi_pos=pos-2
-    i = 1
-    t = st.empty()
-    
-    
-
-    for molecule in molecules:
-        try:
-            smiles = molecule.strip()
-            mol = Chem.MolFromSmiles(smiles)
-            standarized_mol = s.super_parent(mol) 
-            standardizer_smiles = Chem.MolToSmiles(standarized_mol)
-            standardized_molecules.append(standardizer_smiles)
-            # st.write(f'\rProcessing molecule {i}/{len(molecules)}', end='', flush=True)
-            t.markdown("Processing monomers: " + str(i) +"/" + str(len(molecules)))
-
-            i = i + 1
-        except:
-            standardized_molecules.append(molecule)
-    df['standarized_SMILES'] = standardized_molecules
-
+# ============== Small utilities (FIX helpers) ==========
+def ensure_unique_cols(df: pd.DataFrame) -> pd.DataFrame:
+    """Ensure column names are unique to avoid narwhals DuplicateError."""
+    if not df.columns.is_unique:
+        df = df.loc[:, ~df.columns.duplicated()].copy()
     return df
 
+def _as_1d_text(x):
+    """Coerce DataFrame/Series/list/ndarray to list[str] 1-D for Plotly text=."""
+    if isinstance(x, pd.DataFrame):
+        if x.shape[1] == 0:
+            return []
+        x = x.iloc[:, 0]
+    if isinstance(x, pd.Series):
+        arr = x.values
+    else:
+        arr = np.asarray(x)
+    arr = np.ravel(arr)
+    return [str(v) for v in arr]
 
-#%% Protonation state at pH 7.4 ####
-####---------------------------------------------------------------------------####
+def _as_1d_array(x):
+    return np.ravel(np.asarray(x))
 
-def charges_ph(molecule, ph):
+# ============== Standardization ========================
+def standardizer(df, pos: int):
+    """Standardize SMILES using MOLVS (if available)."""
+    if Standardizer is None:
+        st.warning("molvs not installed; skipping standardization.")
+        df['standarized_SMILES'] = df.iloc[:, pos].astype(str)
+        return df
 
-    # obConversion it's neccesary for saving the objects
+    s = Standardizer()
+    molecules = df.iloc[:, pos].astype(str).tolist()
+    standardized_molecules = []
+    t = st.empty()
+
+    for i, smiles in enumerate(molecules, start=1):
+        try:
+            sm = smiles.strip()
+            mol = Chem.MolFromSmiles(sm)
+            std_mol = s.super_parent(mol)
+            std_smiles = Chem.MolToSmiles(std_mol)
+            standardized_molecules.append(std_smiles)
+        except Exception:
+            standardized_molecules.append(smiles)
+        t.markdown(f"Processing monomers: {i}/{len(molecules)}")
+
+    df['standarized_SMILES'] = standardized_molecules
+    return df
+
+# ============== Optional OpenBabel protonation =========
+def charges_ph(molecule: str, ph: float) -> str:
+    if openbabel is None:
+        return molecule
     obConversion = openbabel.OBConversion()
     obConversion.SetInAndOutFormats("smi", "smi")
-    
-    # create the OBMol object and read the SMILE
     mol = openbabel.OBMol()
     obConversion.ReadString(mol, molecule)
-    
-    # Add H, correct pH and add H again, it's the only way it works
-    #mol.AddHydrogens()
-    #mol.CorrectForPH(7.4)
-    #mol.AddHydrogens()
-    
-    # transforms the OBMOl objecto to string (SMILES)
-    optimized = obConversion.WriteString(mol)
-    
-    return optimized
+    # You can enable:
+    # mol.AddHydrogens(); mol.CorrectForPH(ph); mol.AddHydrogens()
+    return obConversion.WriteString(mol)
 
-def smile_obabel_corrector(smiles_ionized):
-    mol1 = Chem.MolFromSmiles(smiles_ionized, sanitize = True)
+def smile_obabel_corrector(smiles_ionized: str) -> str:
+    mol1 = Chem.MolFromSmiles(smiles_ionized, sanitize=True)
+    return Chem.MolToSmiles(mol1) if mol1 else smiles_ionized
 
-    smile_checked = Chem.MolToSmiles(mol1)
-    return smile_checked
-
-
-#%% formal charge calculation
-
-def formal_charge_calculation(descriptors):
+# ============== Formal charge ==========================
+def formal_charge_calculation(descriptors: pd.DataFrame) -> pd.DataFrame:
     smiles_list = descriptors["Smiles_OK"]
     charges = []
     for smiles in smiles_list:
         try:
             mol = Chem.MolFromSmiles(smiles)
-            charge = Chem.rdmolops.GetFormalCharge(mol)
-            charges.append(charge)
-        except:
+            charges.append(Chem.rdmolops.GetFormalCharge(mol))
+        except Exception:
             charges.append(None)
-        
     descriptors["Formal_charge"] = charges
     return descriptors
 
-def calc_descriptors(data, smiles_col_pos):
-    
-    # Create empty lists to store the results
-    results3 = []
-    results12 = []
-    results13 = []
-    results17 = []
-    results18 = []
-    molecule_counts1 = []
-    molecule_counts2 = []
-    molecule_counts4 = []
-    molecule_counts5 = []
-    molecule_counts6 = []
-    molecule_counts7 = []
-    molecule_counts8 = []
-    molecule_counts9 = []
+# ============== SMARTS-based fragment counts ===========
+def calc_descriptors(data: pd.DataFrame, smiles_col_pos: int):
+    """
+    Build fragment counts & presence flags.
+    FIXES:
+      - Proper 'NAME' list collected in loop
+      - Typos corrected for sets: used_central_pair_ccco, used_indices_br
+    """
+    # SMARTS
+    smarts_pattern1  = Chem.MolFromSmarts('[Cl]-[*]')
+    smarts_pattern2  = Chem.MolFromSmarts('[c;X3](c)(c)-[CH3]')
+    smarts_pattern3  = Chem.MolFromSmarts('[O]=C-[C]-O')
+    smarts_pattern4_1= Chem.MolFromSmarts('c:c-c:c')
+    smarts_pattern4_2= Chem.MolFromSmarts('c:c:c:c')
+    smarts_pattern5  = Chem.MolFromSmarts('[#6]-[#7]=[#8]')
+    smarts_pattern6  = Chem.MolFromSmarts('[C,c][CH3]')
+    smarts_pattern7  = Chem.MolFromSmarts('I-c:c:c')
+    smarts_pattern8  = Chem.MolFromSmarts('[C,c]:[C,c]-[F]')
+    smarts_pattern9_1= Chem.MolFromSmarts('O-c:c-C')
+    smarts_pattern9_2= Chem.MolFromSmarts('O-c:[cH]:c')
+    smarts_pattern10 = Chem.MolFromSmarts('[C,c][C;H2][C,c]')
+    smarts_pattern11 = Chem.MolFromSmarts('S-[C,c]')
+    smarts_pattern12 = Chem.MolFromSmarts('C-O-C=O')
+    smarts_pattern13 = Chem.MolFromSmarts('[C](=O)(O)[C,c]')
+    smarts_pattern14 = Chem.MolFromSmarts('[C;H1,H2](O)[C,c]')
+    smarts_pattern15 = Chem.MolFromSmarts('Br-c:c-O')
+    smarts_pattern16 = Chem.MolFromSmarts('O-[CH3]')
+    smarts_pattern17 = Chem.MolFromSmarts('[C;H1,H2](=O)[C,c]')
+    smarts_pattern18 = Chem.MolFromSmarts('C=O')
+    smarts_pattern19 = Chem.MolFromSmarts('c:c-C=O')
+    smarts_pattern20 = Chem.MolFromSmarts('[Br][C,c]')
+    smarts_pattern21 = Chem.MolFromSmarts('N')
+    smarts_pattern22 = Chem.MolFromSmarts('Br-c:c-Br')
+
+    names = []  # FIX collect names
+    # presence/flags
+    results3  = []  # O=C-C-O (presence)
+    results12 = []  # C-O-C=O (presence)
+    results13 = []  # (C=O),(C-C),(C-O),xC (presence)
+    results17 = []  # (C=O),(C-C),xC (presence)
+    results18 = []  # C=O (presence)
+    # counts
+    molecule_counts1  = []
+    molecule_counts2  = []
+    molecule_counts4  = []
+    molecule_counts5  = []
+    molecule_counts6  = []
+    molecule_counts7  = []
+    molecule_counts8  = []
+    molecule_counts9  = []
     molecule_counts10 = []
     molecule_counts11 = []
     molecule_counts14 = []
@@ -216,474 +275,328 @@ def calc_descriptors(data, smiles_col_pos):
     molecule_counts20 = []
     molecule_counts21 = []
     molecule_counts22 = []
-    
-    # Define SMARTS patterns
-    smarts_pattern1 = Chem.MolFromSmarts('[Cl]-[*]')  #OKK
-    smarts_pattern2 = Chem.MolFromSmarts('[c;X3](c)(c)-[CH3]')  #OK
-    smarts_pattern3 = Chem.MolFromSmarts('[O]=C-[C]-O')  #OK
-    smarts_pattern4_1 = Chem.MolFromSmarts('c:c-c:c') #OK
-    smarts_pattern4_2 = Chem.MolFromSmarts('c:c:c:c') #OK
-    smarts_pattern5 = Chem.MolFromSmarts('[#6]-[#7]=[#8]')  #OK
-    smarts_pattern6 = Chem.MolFromSmarts('[C,c][CH3]')
-    smarts_pattern7 = Chem.MolFromSmarts('I-c:c:c') #OK           
-    smarts_pattern8 = Chem.MolFromSmarts('[C,c]:[C,c]-[F]') #OK            
-    smarts_pattern9_1 = Chem.MolFromSmarts('O-c:c-C') #OK
-    smarts_pattern9_2 = Chem.MolFromSmarts('O-c:[cH]:c') #OK
-    smarts_pattern10 = Chem.MolFromSmarts('[C,c][C;H2][C,c]') 
-    smarts_pattern11 = Chem.MolFromSmarts('S-[C,c]') #OK
-    smarts_pattern12 = Chem.MolFromSmarts('C-O-C=O') #OK
-    smarts_pattern13 = Chem.MolFromSmarts('[C](=O)(O)[C,c]') #OK
-    smarts_pattern14 = Chem.MolFromSmarts('[C;H1,H2](O)[C,c]') #OK
-    smarts_pattern15 = Chem.MolFromSmarts('Br-c:c-O') #OK
-    smarts_pattern16 = Chem.MolFromSmarts('O-[CH3]')  #OK
-    smarts_pattern17 = Chem.MolFromSmarts('[C;H1,H2](=O)[C,c]') #OK
-    smarts_pattern18 = Chem.MolFromSmarts('C=O')  #OK
-    smarts_pattern19 = Chem.MolFromSmarts('c:c-C=O') #OK
-    smarts_pattern20 = Chem.MolFromSmarts('[Br][C,c]') #OK
-    smarts_pattern21 = Chem.MolFromSmarts('N')  #OK
-    smarts_pattern22 = Chem.MolFromSmarts('Br-c:c-Br') #OK 
-    smiles_list = []
-    t = st.empty()
 
-    # Placeholder for the spinner
     with st.spinner('CALCULATING DESCRIPTORS (STEP 1 OF 3)...'):
-        time.sleep(1)  # Sleep for 5 seconds to mimic computation
-        # Loop through each molecule in the dataset
-  
-    
-        
-        for pos, row in data.iterrows():
-                molecule_name = row.iloc[0]  # Assuming the first column contains the molecule names
-                molecule_smiles = row.iloc[smiles_col_pos]  # Assuming the specified column contains the SMILES
-    
-                if pd.isna(molecule_smiles) or molecule_smiles.strip() == '':
-                            continue  # Skip to the next row if SMILES is empty
-    
-                mol = Chem.MolFromSmiles(molecule_smiles)  # Convert SMILES to RDKit Mol object
-                if mol is not None:
-                    smiles_ionized =  molecule_smiles #charges_ph(molecule_smiles, 7.4)
-                    smile_checked = smiles_ionized #smile_obabel_corrector(smiles_ionized)
-                    #smile_checked = smiles_ionized
-                    smile_final = smile_checked.rstrip()
-                    smiles_list.append(smile_final)
-                    # Define substructure match logic for each pattern
-                    fragment3 = mol.HasSubstructMatch(smarts_pattern3)
-                    fragment9_1 = mol.HasSubstructMatch(smarts_pattern9_1)
-                    #Check for matches in the molecule
-                    fragment9_2 = mol.GetSubstructMatches(smarts_pattern9_2)
-                   
-                    # Filter the matches to count only unique c-O bonds
-                    filtered_matches_oc = []
-                    used_oxygen_atoms = set()  # Track oxygen atoms to ensure uniqueness
-                    
-                    for match in fragment9_2:
-                        for atom_idx in match:
-                            atom = mol.GetAtomWithIdx(atom_idx)
-                            if atom.GetSymbol() == 'O' and atom_idx not in used_oxygen_atoms:
-                                # Add the match if it contains a new oxygen
-                                filtered_matches_oc.append(match)
-                                used_oxygen_atoms.add(atom_idx)  # Mark this oxygen as used
-                                break  # Only count one c-O per match
-        
-    
-                    fragment12 = mol.HasSubstructMatch(smarts_pattern12)
-                    fragment13 = mol.HasSubstructMatch(smarts_pattern13)
-    
-    
-                    fragment15 = mol.GetSubstructMatches(smarts_pattern15)
-                    # Find non-overlapping fragments
-                    non_overlapping_matches_br_cc_o = []
-                    used_indices_br_cc_o = set()
-                    
-                    for match in fragment15:
-                        # Check if any of the indices in the current match overlap with already used indices
-                        if not any(index in used_indices_br_cc_o for index in match):
-                            # If there is no overlap, add this match to the non-overlapping list
-                            non_overlapping_matches_br_cc_o.append(match)
-                            # Mark these indices as used
-                            used_indices_br_cc_o.update(match)
-    
-                    fragment17 = mol.HasSubstructMatch(smarts_pattern17)
-                    fragment18 = mol.HasSubstructMatch(smarts_pattern18)
-    
-                    # Check for matches in the molecule
-                    fragment19 = mol.GetSubstructMatches(smarts_pattern19)
-                    
-                    # Initialize a set to track used pairs of central atoms (position 1 and 2 in the match tuple)
-                    used_central_pair_ccco = set()
-                    
-                    # Filter the matches to avoid duplicate (second, third) atom pairs
-                    filtered_matches_ccco = []
-                    for match in fragment19:
-                        central_pair = (match[1], match[2])  # Second and third atoms (central pair)
-                        
-                        # Only keep the match if the pair hasn't been used yet
-                        if central_pair not in used_central_pair:
-                            filtered_matches_ccco.append(match)
-                            # Mark the pair as used
-                            used_central_pair_ccco.add(central_pair)
-    
-                    # Check for matches in the molecule
-                    fragment22 = mol.GetSubstructMatches(smarts_pattern22)
-            
-                    # Find non-overlapping fragments
-                    non_overlapping_matches_br = []
-                    used_indices_br = set()
-                    
-                    for match in fragment22:
-                    # Check if any of the indices in the current match overlap with already used indices
-                        if not any(index in used_indices for index in match):
-                            # If there is no overlap, add this match to the non-overlapping list
-                            non_overlapping_matches_br.append(match)
-                            # Mark these indices as used
-                            used_indices_br.update(match)
-    
-                    
-        
-                    # Count the occurrences of smarts_pattern4 in the molecule
-                    count_in_molecule1 = len(mol.GetSubstructMatches(smarts_pattern1))
-                    count_in_molecule2 = len(mol.GetSubstructMatches(smarts_pattern2))
-            
-                    count_in_molecule4_1 = len(mol.GetSubstructMatches(smarts_pattern4_1))/4
-                    count_in_molecule4_2 = len(mol.GetSubstructMatches(smarts_pattern4_2))/2
-            
-                    # Check for rings
-                    ring_info = mol.GetRingInfo()
-                    rings = ring_info.AtomRings()  # List of rings
-                    
-                    # Check if there are two rings and if they are connected
-                    connected = False
-                    if len(rings) >= 2:  # Check if there are at least two rings
-                        # Convert ring atom indices to sets
-                        ring1_atoms = set(rings[0])  # First ring's atoms
-                        for i in range(1, len(rings)):
-                            ring2_atoms = set(rings[i])  # Current ring's atoms
-                            # Check for intersection (shared atoms)
-                            if ring1_atoms.intersection(ring2_atoms):
-                                connected = True
-                                break
-                    
-                    # Adjust count1 if two rings are connected
-                    if connected:
-                        count_in_molecule4_2 -= 2
-                        
-                    count_in_molecule4 = count_in_molecule4_1 + count_in_molecule4_2
-                    count_in_molecule5 = len(mol.GetSubstructMatches(smarts_pattern5))
-                    count_in_molecule6 = len(mol.GetSubstructMatches(smarts_pattern6))
-                    count_in_molecule7 = len(mol.GetSubstructMatches(smarts_pattern7))/2
-                    count_in_molecule8 = len(mol.GetSubstructMatches(smarts_pattern8))/2
-                    count_in_molecule9_1 = len(mol.GetSubstructMatches(smarts_pattern9_1))
-                    count_in_molecule9_2 = len(filtered_matches_oc)
-                    count_in_molecule9 = count_in_molecule9_1 + count_in_molecule9_2
-                    count_in_molecule10 = len(mol.GetSubstructMatches(smarts_pattern10))
-                    count_in_molecule11 = len(mol.GetSubstructMatches(smarts_pattern11))
-                    count_in_molecule14 = len(mol.GetSubstructMatches(smarts_pattern14))
-                    count_in_molecule15 = len(non_overlapping_matches_br_cc_o)
-                    count_in_molecule16 = len(mol.GetSubstructMatches(smarts_pattern16))
-                    count_in_molecule19 = len(filtered_matches_ccco)/2
-                    count_in_molecule20 = len(mol.GetSubstructMatches(smarts_pattern20))
-                    count_in_molecule21 = len(mol.GetSubstructMatches(smarts_pattern21))
-                    count_in_molecule22 = len(non_overlapping_matches_br)
-        
-                    # Append the results for each fragment pattern to respective lists
-                    
-                    results3.append(int(fragment3))
-                    results12.append(int(fragment12))
-                    results13.append(int(fragment13))
-                    results17.append(int(fragment17)) 
-                    results18.append(int(fragment18))
-                
-                    molecule_counts1.append(int(count_in_molecule1))
-                    molecule_counts2.append(int(count_in_molecule2))
-                    molecule_counts4.append(int(count_in_molecule4))
-                    molecule_counts5.append(int(count_in_molecule5))
-                    molecule_counts6.append(int(count_in_molecule6))
-                    molecule_counts7.append(int(count_in_molecule7))
-                    molecule_counts8.append(int(count_in_molecule8))
-                    molecule_counts9.append(int(count_in_molecule9))
-                    molecule_counts10.append(int(count_in_molecule10))
-                    molecule_counts11.append(int(count_in_molecule11))
-                    molecule_counts14.append(int(count_in_molecule14))
-                    molecule_counts15.append(int(count_in_molecule15))
-                    molecule_counts16.append(int(count_in_molecule16))
-                    molecule_counts19.append(int(count_in_molecule19))
-                    molecule_counts20.append(int(count_in_molecule20))
-                    molecule_counts21.append(int(count_in_molecule21))
-                    molecule_counts22.append(int(count_in_molecule22))
-    
-    
-            # Create a DataFrame to store the results
-        descriptors_total = pd.DataFrame({
-            'NAME': molecule_name,
-            'Cl-C': molecule_counts1, 
-            '(C=C),(C-C),(C-C),xC': molecule_counts2,
-            'O=C-C-O': results3,
-            'C=C-C=C': molecule_counts4,
-            'C-N=O': molecule_counts5,
-            '(C-C),xC': molecule_counts6,
-            'I-C-C=C': molecule_counts7,
-            'C-C-F': molecule_counts8,
-            'C-C=C-O': molecule_counts9,
-            '(C-C),(C-C),xC' : molecule_counts10,
-            'S-C': molecule_counts11,
-            'C-O-C=O' : results12,
-            '(C=O),(C-C),(C-O),xC' : results13,
-            '(C-C),(C-O),xC' : molecule_counts14,
-            'Br-C-C-O': molecule_counts15,
-            '(C-O),xC': molecule_counts16,
-            '(C=O),(C-C),xC': results17,    
-            'C=O': results18,
-            'C=C-C=O' : molecule_counts19,
-            '(Br-C),xBr': molecule_counts20,
-            'N' : molecule_counts21,
-            'Br-C=C-Br': molecule_counts22,
-            
-        })
-    
-        return descriptors_total, smiles_list
+        time.sleep(1)
 
+        for _, row in data.iterrows():
+            molecule_name = row.iloc[0]
+            smiles = str(row.iloc[smiles_col_pos]).strip()
+            if not smiles or pd.isna(smiles):
+                continue
+            mol = Chem.MolFromSmiles(smiles)
+            if mol is None:
+                continue
 
-def reading_reorder(data, loaded_desc):
-        
-    #Select the specified columns from the DataFrame
+            names.append(molecule_name)
+
+            # presence
+            fragment3  = mol.HasSubstructMatch(smarts_pattern3)
+            fragment12 = mol.HasSubstructMatch(smarts_pattern12)
+            fragment13 = mol.HasSubstructMatch(smarts_pattern13)
+            fragment17 = mol.HasSubstructMatch(smarts_pattern17)
+            fragment18 = mol.HasSubstructMatch(smarts_pattern18)
+
+            # 9_2 filtered: unique oxygen atoms
+            matches_9_2 = mol.GetSubstructMatches(smarts_pattern9_2)
+            filtered_matches_oc = []
+            used_oxygen_atoms = set()
+            for match in matches_9_2:
+                for atom_idx in match:
+                    atom = mol.GetAtomWithIdx(atom_idx)
+                    if atom.GetSymbol() == 'O' and atom_idx not in used_oxygen_atoms:
+                        filtered_matches_oc.append(match)
+                        used_oxygen_atoms.add(atom_idx)
+                        break
+
+            # 15 filtered: non-overlapping indices
+            matches_15 = mol.GetSubstructMatches(smarts_pattern15)
+            non_overlapping_matches_br_cc_o = []
+            used_indices_br_cc_o = set()
+            for match in matches_15:
+                if not any(idx in used_indices_br_cc_o for idx in match):
+                    non_overlapping_matches_br_cc_o.append(match)
+                    used_indices_br_cc_o.update(match)
+
+            # 19 filtered: unique central pair (1,2)
+            matches_19 = mol.GetSubstructMatches(smarts_pattern19)
+            used_central_pair_ccco = set()
+            filtered_matches_ccco = []
+            for match in matches_19:
+                central_pair = (match[1], match[2])
+                if central_pair not in used_central_pair_ccco:
+                    filtered_matches_ccco.append(match)
+                    used_central_pair_ccco.add(central_pair)
+
+            # 22 filtered: non-overlapping indices (FIX: used_indices_br)
+            matches_22 = mol.GetSubstructMatches(smarts_pattern22)
+            non_overlapping_matches_br = []
+            used_indices_br = set()
+            for match in matches_22:
+                if not any(idx in used_indices_br for idx in match):
+                    non_overlapping_matches_br.append(match)
+                    used_indices_br.update(match)
+
+            # counts
+            c1  = len(mol.GetSubstructMatches(smarts_pattern1))
+            c2  = len(mol.GetSubstructMatches(smarts_pattern2))
+            c4_1= len(mol.GetSubstructMatches(smarts_pattern4_1))/4
+            c4_2= len(mol.GetSubstructMatches(smarts_pattern4_2))/2
+
+            # ring adjust
+            ring_info = mol.GetRingInfo()
+            rings = ring_info.AtomRings()
+            connected = False
+            if len(rings) >= 2:
+                ring1_atoms = set(rings[0])
+                for i in range(1, len(rings)):
+                    ring2_atoms = set(rings[i])
+                    if ring1_atoms.intersection(ring2_atoms):
+                        connected = True
+                        break
+            if connected:
+                c4_2 -= 2
+            c4 = c4_1 + c4_2
+
+            c5  = len(mol.GetSubstructMatches(smarts_pattern5))
+            c6  = len(mol.GetSubstructMatches(smarts_pattern6))
+            c7  = len(mol.GetSubstructMatches(smarts_pattern7))/2
+            c8  = len(mol.GetSubstructMatches(smarts_pattern8))/2
+            c9_1= len(mol.GetSubstructMatches(smarts_pattern9_1))
+            c9_2= len(filtered_matches_oc)
+            c9  = c9_1 + c9_2
+            c10 = len(mol.GetSubstructMatches(smarts_pattern10))
+            c11 = len(mol.GetSubstructMatches(smarts_pattern11))
+            c14 = len(mol.GetSubstructMatches(smarts_pattern14))
+            c15 = len(non_overlapping_matches_br_cc_o)
+            c16 = len(mol.GetSubstructMatches(smarts_pattern16))
+            c19 = len(filtered_matches_ccco)/2
+            c20 = len(mol.GetSubstructMatches(smarts_pattern20))
+            c21 = len(mol.GetSubstructMatches(smarts_pattern21))
+            c22 = len(non_overlapping_matches_br)
+
+            # append
+            results3.append(int(fragment3))
+            results12.append(int(fragment12))
+            results13.append(int(fragment13))
+            results17.append(int(fragment17))
+            results18.append(int(fragment18))
+
+            molecule_counts1.append(int(c1))
+            molecule_counts2.append(int(c2))
+            molecule_counts4.append(int(c4))
+            molecule_counts5.append(int(c5))
+            molecule_counts6.append(int(c6))
+            molecule_counts7.append(int(c7))
+            molecule_counts8.append(int(c8))
+            molecule_counts9.append(int(c9))
+            molecule_counts10.append(int(c10))
+            molecule_counts11.append(int(c11))
+            molecule_counts14.append(int(c14))
+            molecule_counts15.append(int(c15))
+            molecule_counts16.append(int(c16))
+            molecule_counts19.append(int(c19))
+            molecule_counts20.append(int(c20))
+            molecule_counts21.append(int(c21))
+            molecule_counts22.append(int(c22))
+
+    descriptors_total = pd.DataFrame({
+        'NAME': names,
+        'Cl-C': molecule_counts1,
+        '(C=C),(C-C),(C-C),xC': molecule_counts2,
+        'O=C-C-O': results3,
+        'C=C-C=C': molecule_counts4,
+        'C-N=O': molecule_counts5,
+        '(C-C),xC': molecule_counts6,
+        'I-C-C=C': molecule_counts7,
+        'C-C-F': molecule_counts8,
+        'C-C=C-O': molecule_counts9,
+        '(C-C),(C-C),xC': molecule_counts10,
+        'S-C': molecule_counts11,
+        'C-O-C=O': results12,
+        '(C=O),(C-C),(C-O),xC': results13,
+        '(C-C),(C-O),xC': molecule_counts14,
+        'Br-C-C-O': molecule_counts15,
+        '(C-O),xC': molecule_counts16,
+        '(C=O),(C-C),xC': results17,
+        'C=O': results18,
+        'C=C-C=O': molecule_counts19,
+        '(Br-C),xBr': molecule_counts20,
+        'N': molecule_counts21,
+        'Br-C=C-Br': molecule_counts22,
+    })
+
+    # Return ordered SMILES list if you need it
+    return descriptors_total, None
+
+# ============== Reorder to model descriptor order ======
+def reading_reorder(data: pd.DataFrame, loaded_desc):
     df_selected = data[loaded_desc]
-    df_id = data.reset_index()
-    df_id.rename(columns={'index': 'NAME'}, inplace=True)
-    id = df_id['NAME'] 
-    # Order the DataFrame by the specified list of columns
-    test_data = df_selected.reindex(columns=loaded_desc)
-    # Fill missing values with 0
-    test_data = test_data.fillna(0)
-    #descriptors_total = data[loaded_desc]
+    df_selected = df_selected.reindex(columns=loaded_desc)
+    df_selected = df_selected.fillna(0)
+    df_selected = ensure_unique_cols(df_selected)
 
+    # Build an ID series (first column of original data) to use as labels
+    df_id = data.reset_index(drop=True)
+    id_series = df_id.iloc[:, 0].astype(str)
+    return df_selected, id_series
 
-    return test_data, id
-
-
-
-
-
-
-#%% normalizing data1
-### ----------------------- ###
-
+# ============== Normalization placeholders ============
 def normalize_data(train_data, test_data):
-    df_train_normalized = pd.DataFrame(train_data)
-    df_test_normalized = pd.DataFrame(test_data)
-
+    # Plug your real scaler here if needed. Kept identity to match your original.
+    df_train_normalized = pd.DataFrame(train_data).copy()
+    df_test_normalized  = pd.DataFrame(test_data).copy()
     return df_train_normalized, df_test_normalized
 
+# ============== Applicability Domain ==================
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_squared_error
 
-#%% Determining Applicability Domain (AD)
-
-def applicability_domain(x_test_normalized, x_train_normalized):
-    y_train=data_train['pLC50']
+def applicability_domain(x_test_normalized, x_train_normalized, y_train):
     X_train = x_train_normalized.values
-    X_test = x_test_normalized.values
-    # Calculate leverage and standard deviation for the training set
-    hat_matrix_train = X_train @ np.linalg.inv(X_train.T @ X_train) @ X_train.T
-    leverage_train = np.diagonal(hat_matrix_train)
-    leverage_train=leverage_train.ravel()
-    
-    # Calculate leverage and standard deviation for the test set
-    hat_matrix_test = X_test @ np.linalg.inv(X_train.T @ X_train) @ X_test.T
-    leverage_test = np.diagonal(hat_matrix_test)
-    leverage_test=leverage_test.ravel()
+    X_test  = x_test_normalized.values
 
+    # Leverage
+    hat_train = X_train @ np.linalg.inv(X_train.T @ X_train) @ X_train.T
+    leverage_train = np.diagonal(hat_train).ravel()
 
-    from sklearn.linear_model import LinearRegression
-    from sklearn.metrics import mean_squared_error
+    hat_test = X_test @ np.linalg.inv(X_train.T @ X_train) @ X_test.T
+    leverage_test = np.diagonal(hat_test).ravel()
 
-    # Train a linear regression model
+    # Std residuals for training (using linear regression fitted on train)
     lr = LinearRegression()
-    lr.fit(df_train_normalized, y_train)
-    y_pred_train = lr.predict(df_train_normalized)
-    
+    lr.fit(x_train_normalized, y_train)
+    y_pred_train = lr.predict(x_train_normalized)
     std_dev_train = np.sqrt(mean_squared_error(y_train, y_pred_train))
-    std_residual_train = (y_train - y_pred_train) / std_dev_train
-    std_residual_train = std_residual_train.ravel()
-    
-    # threshold for the applicability domain
-    
-    h3 = 3*((x_train_normalized.shape[1]+1)/x_train_normalized.shape[0])  
-    
-    diagonal_compare = list(leverage_test)
-    h_results =[]
-    for valor in diagonal_compare:
-        if valor < h3:
-            h_results.append(True)
-        else:
-            h_results.append(False)         
-    return h_results, leverage_train, leverage_test, std_residual_train 
+    std_residual_train = (y_train - y_pred_train) / (std_dev_train if std_dev_train != 0 else 1.0)
+    std_residual_train = np.ravel(std_residual_train)
 
+    # h_critical
+    h3 = 3 * ((x_train_normalized.shape[1] + 1) / x_train_normalized.shape[0])
+    h_results = [val < h3 for val in leverage_test]
 
+    return h_results, leverage_train, leverage_test, std_residual_train
 
- # Function to assign colors based on confidence values
+# ============== Confidence color ======================
 def get_color(confidence):
-    """
-    Assigns a color based on the confidence value.
-
-    Args:
-        confidence (float): The confidence value.
-
-    Returns:
-        str: The color in hexadecimal format (e.g., '#RRGGBB').
-    """
-    # Define your color logic here based on confidence
-    if confidence == "HIGH" or confidence == "Inside AD":
+    if confidence in ("HIGH", "Inside AD"):
         return 'green'
     elif confidence == "MEDIUM":
         return 'yellow'
     else:
-        confidence ==  "LOW"
         return 'red'
 
-
-#%% Predictions        
-
-def predictions(loaded_model, loaded_desc, df_test_normalized):
+# ============== Predictions wrapper ===================
+def predictions(loaded_model, loaded_desc, df_test_normalized, df_train_normalized, data, mean_value):
     scores = []
     h_values = []
     std_resd = []
-    idx = data['ID']
-    
-    descriptors_model = loaded_desc
-    # Placeholder for the spinner
+
+    # Robust ID index (FIX)
+    idx = data['ID'] if 'ID' in data.columns else data.iloc[:, 0].astype(str)
+
     with st.spinner('CALCULATING PREDICTIONS (STEP 2 OF 3)...'):
-        # Simulate a long-running computation
-        time.sleep(1)  # Sleep for 5 seconds to mimic computation
-     
-        X = df_test_normalized[descriptors_model]
-        predictions = loaded_model.predict(X)
-        scores.append(predictions)
-        
-        # y_true and y_pred are the actual and predicted values, respectively
-    
-        # Create y_true array with all elements set to mean value and the same length as y_pred
-        y_pred_test = predictions
-        y_test = np.full_like(y_pred_test, mean_value)
-        residuals_test = y_test -y_pred_test
+        time.sleep(1)
+        X = df_test_normalized[loaded_desc]
+        preds = loaded_model.predict(X)
+        scores.append(preds)
 
+        # synthetic residuals vs mean (as in your original)
+        y_pred_test = preds
+        y_test = np.full_like(y_pred_test, mean_value, dtype=float)
         std_dev_test = np.sqrt(mean_squared_error(y_test, y_pred_test))
-        std_residual_test = (y_test - y_pred_test) / std_dev_test
+        std_residual_test = (y_test - y_pred_test) / (std_dev_test if std_dev_test != 0 else 1.0)
         std_residual_test = std_residual_test.ravel()
-          
         std_resd.append(std_residual_test)
-        
-        h_results, leverage_train, leverage_test, std_residual_train  = applicability_domain(df_test_normalized, df_train_normalized)
-        h_values.append(h_results)
-    
 
+        # AD based on training
+        y_train = data_train['pLC50']
+        h_results, leverage_train, leverage_test, std_residual_train = applicability_domain(
+            df_test_normalized, df_train_normalized, y_train
+        )
+        h_values.append(h_results)
+
+        # Final tables
         dataframe_pred = pd.DataFrame(scores).T
         dataframe_pred.index = idx
-        dataframe_pred.rename(columns={0: "pLC50"},inplace=True)
-    
+        dataframe_pred.rename(columns={0: "pLC50"}, inplace=True)
+
         dataframe_std = pd.DataFrame(std_resd).T
         dataframe_std.index = idx
-                
+
         h_final = pd.DataFrame(h_values).T
         h_final.index = idx
-        h_final.rename(columns={0: "Confidence"},inplace=True)
+        h_final.rename(columns={0: "Confidence"}, inplace=True)
 
-        std_ensemble = dataframe_std.iloc[:,0]
-        # Create a mask using boolean indexing
-        std_ad_calc = (std_ensemble >= 3) | (std_ensemble <= -3) 
+        std_ensemble = dataframe_std.iloc[:, 0]
+        std_ad_calc = (std_ensemble >= 3) | (std_ensemble <= -3)
         std_ad_calc = std_ad_calc.replace({True: 'Outside AD', False: 'Inside AD'})
-   
-    
-        final_file = pd.concat([std_ad_calc,h_final,dataframe_pred], axis=1)
-    
-        final_file.rename(columns={0: "Std_residual"},inplace=True)
-    
-        h3 = 3*((df_train_normalized.shape[1]+1)/df_train_normalized.shape[0])  ##  Mas flexible
 
-        final_file.loc[(final_file["Confidence"] == True) & ((final_file["Std_residual"] == 'Inside AD' )), 'Confidence'] = 'HIGH'
-        final_file.loc[(final_file["Confidence"] == True) & ((final_file["Std_residual"] == 'Outside AD')), 'Confidence'] = 'LOW'
-        final_file.loc[(final_file["Confidence"] == False) & ((final_file["Std_residual"] == 'Outside AD')), 'Confidence'] = 'LOW'
-        final_file.loc[(final_file["Confidence"] == False) & ((final_file["Std_residual"] == 'Inside AD')), 'Confidence'] = 'MEDIUM'
+        final_file = pd.concat([std_ad_calc, h_final, dataframe_pred], axis=1)
+        final_file.rename(columns={0: "Std_residual"}, inplace=True)
 
+        # Assign textual confidence
+        final_file.loc[(final_file["Confidence"] == True) & (final_file["Std_residual"] == 'Inside AD'),  'Confidence'] = 'HIGH'
+        final_file.loc[(final_file["Confidence"] == True) & (final_file["Std_residual"] == 'Outside AD'), 'Confidence'] = 'LOW'
+        final_file.loc[(final_file["Confidence"] == False) & (final_file["Std_residual"] == 'Outside AD'),'Confidence'] = 'LOW'
+        final_file.loc[(final_file["Confidence"] == False) & (final_file["Std_residual"] == 'Inside AD'), 'Confidence'] = 'MEDIUM'
+
+        # Style
         df_no_duplicates = final_file[~final_file.index.duplicated(keep='first')]
-        styled_df = df_no_duplicates.style.apply(lambda row: [f"background-color: {get_color(row['Confidence'])}" for _ in row],subset=["Confidence"], axis=1)
-    
-        return final_file, styled_df,leverage_train,std_residual_train, leverage_test, std_residual_test
+        styled_df = df_no_duplicates.style.apply(
+            lambda row: [f"background-color: {get_color(row['Confidence'])}" for _ in row],
+            subset=["Confidence"], axis=1
+        )
 
+        return final_file, styled_df, leverage_train, std_residual_train, leverage_test, std_residual_test
 
-#Calculating the William's plot limits
-def calculate_wp_plot_limits(leverage_train,std_residual_train, x_std_max=4, x_std_min=-4):
-    
+# ============== Williams plot limits ==================
+def calculate_wp_plot_limits(leverage_train, std_residual_train, x_std_max=4, x_std_min=-4):
     with st.spinner('CALCULATING APPLICABILITY DOMAIN (STEP 3 OF 3)...'):
-        # Simulate a long-running computation
-        time.sleep(1)  # Sleep for 5 seconds to mimic computation
-        # Getting maximum std value
-        if std_residual_train.max() < 4:
-            x_lim_max_std = x_std_max
-        elif std_residual_train.max() > 4:
-            x_lim_max_std = round(std_residual_train.max()) + 1
+        time.sleep(1)
 
-        # Getting minimum std value
-        if std_residual_train.min() > -4:
-            x_lim_min_std = x_std_min
-        elif std_residual_train.min() < 4:
-            x_lim_min_std = round(std_residual_train.min()) - 1
+        # y limits
+        x_lim_max_std = x_std_max if std_residual_train.max() < 4 else round(float(std_residual_train.max())) + 1
+        x_lim_min_std = x_std_min if std_residual_train.min() > -4 else round(float(std_residual_train.min())) - 1
 
-    
-        #st.write('x_lim_max_std:', x_lim_max_std)
-        #st.write('x_lim_min_std:', x_lim_min_std)
-
-        # Calculation H critical
+        # h critical
         n = len(leverage_train)
         p = df_train_normalized.shape[1]
         h_value = 3 * (p + 1) / n
         h_critical = round(h_value, 4)
-        #st.write('Number of cases training:', n)
-        #st.write('Number of variables:', p)
-        #st.write('h_critical:', h_critical)
 
-        # Getting maximum leverage value
-        if leverage_train.max() < h_critical:
-            x_lim_max_lev = h_critical + h_critical * 0.5
-        elif leverage_train.max() > h_critical:
-            x_lim_max_lev = leverage_train.max() + (leverage_train.max()) * 0.1
-
-        # Getting minimum leverage value
-        if leverage_train.min() < 0:
-            x_lim_min_lev = x_lev_min - x_lev_min * 0.05
-        elif leverage_train.min() > 0:
-            x_lim_min_lev = 0
-
-        #st.write('x_lim_max_lev:', x_lim_max_lev)
+        # x limits leverage
+        x_lim_max_lev = h_critical + h_critical*0.5 if leverage_train.max() < h_critical else float(leverage_train.max())*1.1
+        x_lim_min_lev = 0.0  # FIX: clamp at 0 (leverage is >= 0)
 
         return x_lim_max_std, x_lim_min_std, h_critical, x_lim_max_lev, x_lim_min_lev
 
-import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
+# ============== Williams plot (FIX: 1-D coercion) =====
+def williams_plot(leverage_train, leverage_test, std_residual_train, std_residual_test, id_list_1,
+                  x_lim_max_std, x_lim_min_std, h_critical, x_lim_max_lev, x_lim_min_lev,
+                  show_plot=True, save_plot=False, filename=None, add_title=False, title=None):
 
-def williams_plot(leverage_train, leverage_test, std_residual_train, std_residual_test,id_list_1,
-                  plot_color='cornflowerblue', show_plot=True, save_plot=False, filename=None, add_title=False, title=None):
     fig = go.Figure()
 
-    # Add training data points
     fig.add_trace(go.Scatter(
-        x=leverage_train,
-        y=std_residual_train,
+        x=_as_1d_array(leverage_train),
+        y=_as_1d_array(std_residual_train),
         mode='markers',
         marker=dict(color='cornflowerblue', size=10, line=dict(width=1, color='black')),
         name='Training'
     ))
 
-    # Add test data points
     fig.add_trace(go.Scatter(
-        x=leverage_test,
-        y=std_residual_test,
+        x=_as_1d_array(leverage_test),
+        y=_as_1d_array(std_residual_test),
         mode='markers',
         marker=dict(color='orange', size=10, line=dict(width=1, color='black')),
         name='Prediction',
-        text = id_list_1, # Add compounds IDs for hover
-        hoverinfo = 'text' #Show only the text when hovering
+        text=_as_1d_text(id_list_1),          # FIX: 1-D list[str]
+        hoverinfo='text'
     ))
 
-    # Add horizontal and vertical dashed lines
+    # Lines
     fig.add_shape(type='line', x0=h_critical, y0=x_lim_min_std, x1=h_critical, y1=x_lim_max_std,
                   line=dict(color='black', dash='dash'))
     fig.add_shape(type='line', x0=x_lim_min_lev, y0=3, x1=x_lim_max_lev, y1=3,
@@ -691,28 +604,22 @@ def williams_plot(leverage_train, leverage_test, std_residual_train, std_residua
     fig.add_shape(type='line', x0=x_lim_min_lev, y0=-3, x1=x_lim_max_lev, y1=-3,
                   line=dict(color='black', dash='dash'))
 
-    # Add rectangles for outlier zones
+    # Zones
     fig.add_shape(type='rect', x0=x_lim_min_lev, y0=x_lim_min_std, x1=h_critical, y1=-3,
                   fillcolor='lightgray', opacity=0.4, line_width=0)
     fig.add_shape(type='rect', x0=x_lim_min_lev, y0=3, x1=h_critical, y1=x_lim_max_std,
                   fillcolor='lightgray', opacity=0.4, line_width=0)
-                      
     fig.add_shape(type='rect', x0=h_critical, y0=x_lim_min_std, x1=x_lim_max_lev, y1=-3,
                   fillcolor='lightgray', opacity=0.4, line_width=0)
     fig.add_shape(type='rect', x0=h_critical, y0=3, x1=x_lim_max_lev, y1=x_lim_max_std,
                   fillcolor='lightgray', opacity=0.4, line_width=0)
 
-    # Add annotations for outlier zones
-    fig.add_annotation(x=(h_critical + x_lim_min_lev) / 2, y=-3.5, text='Outlier zone', showarrow=False,
-                       font=dict(size=15))
-    fig.add_annotation(x=(h_critical + x_lim_min_lev) / 2, y=3.5, text='Outlier zone', showarrow=False,
-                       font=dict(size=15))
-    fig.add_annotation(x=(h_critical + x_lim_max_lev) / 2, y=-3.5, text='Outlier zone', showarrow=False,
-                       font=dict(size=15))
-    fig.add_annotation(x=(h_critical + x_lim_max_lev) / 2, y=3.5, text='Outlier zone', showarrow=False,
-                       font=dict(size=15))
+    # Labels
+    fig.add_annotation(x=(h_critical + x_lim_min_lev)/2, y=-3.5, text='Outlier zone', showarrow=False, font=dict(size=15))
+    fig.add_annotation(x=(h_critical + x_lim_min_lev)/2, y=3.5,  text='Outlier zone', showarrow=False, font=dict(size=15))
+    fig.add_annotation(x=(h_critical + x_lim_max_lev)/2, y=-3.5, text='Outlier zone', showarrow=False, font=dict(size=15))
+    fig.add_annotation(x=(h_critical + x_lim_max_lev)/2, y=3.5,  text='Outlier zone', showarrow=False, font=dict(size=15))
 
-    # Update layout
     fig.update_layout(
         width=600,
         height=600,
@@ -721,147 +628,136 @@ def williams_plot(leverage_train, leverage_test, std_residual_train, std_residua
         legend=dict(x=0.99, y=0.825, xanchor='right', yanchor='top', font=dict(size=20)),
         showlegend=True
     )
-
     if add_title and title:
         fig.update_layout(title=dict(text=title, font=dict(size=20)))
 
     if save_plot and filename:
         fig.write_image(filename)
-
     if show_plot:
-        fig.show()
-
+        st.plotly_chart(fig, use_container_width=True)
     return fig
 
-
-#%%
-def filedownload1(df):
-    csv = df.to_csv(index=True,header=True)
-    b64 = base64.b64encode(csv.encode()).decode()  # strings <-> bytes conversions
+# ============== File download helper ==================
+def filedownload1(df: pd.DataFrame):
+    csv = df.to_csv(index=True, header=True)
+    b64 = base64.b64encode(csv.encode()).decode()
     href = f'<a href="data:file/csv;base64,{b64}" download="ml_toxicity_t_pyriformis_pLC50_results.csv">Download CSV File with results</a>'
     return href
 
-
-# Create a function to generate an image with a specific SMARTS pattern highlighted
-def generate_molecule_image(smiles, highlight_mol, color=(1, 0, 0), mol_size=(300, 300)):
-    # Function to generate a molecule image with highlighted substructure
+# ============== Highlight substructure images =========
+def generate_molecule_image(smiles, highlight_mol, color=(1,0,0), mol_size=(300,300)):
     mol = Chem.MolFromSmiles(smiles)
-    if mol:
-        rdDepictor.Compute2DCoords(mol)
-        drawer = rdMolDraw2D.MolDraw2DCairo(mol_size[0], mol_size[1])
-        
-        match = mol.GetSubstructMatch(highlight_mol)
-        highlight_atoms = list(match) if match else []
-        highlight_colors = {atom_idx: color for atom_idx in highlight_atoms}
-        
-        drawer.DrawMolecule(mol, highlightAtoms=highlight_atoms, highlightAtomColors=highlight_colors)
-        drawer.FinishDrawing()
-        
-        # Convert the drawing to PNG format and load it into an Image object
-        png_data = drawer.GetDrawingText()
-        img = Image.open(io.BytesIO(png_data))
-        return img
+    if not mol:
+        return None
+    rdDepictor.Compute2DCoords(mol)
+    drawer = rdMolDraw2D.MolDraw2DCairo(mol_size[0], mol_size[1])
+    match = mol.GetSubstructMatch(highlight_mol)
+    highlight_atoms = list(match) if match else []
+    highlight_colors = {idx: color for idx in highlight_atoms}
+    drawer.DrawMolecule(mol, highlightAtoms=highlight_atoms, highlightAtomColors=highlight_colors)
+    drawer.FinishDrawing()
+    png_data = drawer.GetDrawingText()
+    img = Image.open(io.BytesIO(png_data))
+    return img
 
-#%% RUN
-
+# ============== Load model & descriptors ==============
 data_train = pd.read_csv("data/" + "data_Tpyriformis_22var_original_training.csv")
+data_train = ensure_unique_cols(data_train)
 mean_value = data_train['pLC50'].mean()
-loaded_model = pickle.load(open("models/" + "ml_model_tetrahymena_pyriformis_structural.pickle", 'rb'))
-loaded_desc = pickle.load(open("models/" + "ml_descriptor_tetrahymena_pyriformis_structural.pickle", 'rb'))
 
-# Define the SMARTS patterns you want to highlight
-smarts_patterns = {
-    'O=C-C-O': '[O]=C-[C]-O',
-    'C-C-F': '[C,c]:[C,c]-[F]',
-    '(C=O,(C-C),xC': '[C;H1,H2](=O)[C,c]'
+loaded_model = pickle.load(open("models/" + "ml_model_tetrahymena_pyriformis_structural.pickle", 'rb'))
+loaded_desc  = pickle.load(open("models/" + "ml_descriptor_tetrahymena_pyriformis_structural.pickle", 'rb'))
+
+# example SMARTS to highlight
+highlight_mols = {
+    'O=C-C-O': Chem.MolFromSmarts('[O]=C-[C]-O'),
+    'C-C-F': Chem.MolFromSmarts('[C,c]:[C,c]-[F]'),
+    '(C=O),(C-C),xC': Chem.MolFromSmarts('[C;H1,H2](=O)[C,c]')
 }
 
-# Compile SMARTS patterns into RDKit Mol objects
-highlight_mols = {name: Chem.MolFromSmarts(pattern) for name, pattern in smarts_patterns.items()}
-
-
-
-#Uploaded file calculation ####
+# ============== RUN paths =============================
 if uploaded_file_1 is not None:
     run = st.button("RUN the Model")
-    if run == True:
-        data = pd.read_csv(uploaded_file_1,) 
-        
-        train_data = data_train[loaded_desc]
-        
-        # Calculate descriptors and SMILES for the first data
-        descriptors_total_1, smiles_list_1 = calc_descriptors(data, 1)
-            
-        #df_fragments         
-        #Selecting the descriptors based on model for salt water component
-        test_data1, id_list_1 =  reading_reorder(descriptors_total_1,loaded_desc)
-        
-        X_final2= test_data1
-        
-        df_train_normalized, df_test_normalized = normalize_data(train_data, X_final2)
-        
-        final_file, styled_df,leverage_train,std_residual_train, leverage_test, std_residual_test= predictions(loaded_model, loaded_desc, df_test_normalized)
-        
-        x_lim_max_std, x_lim_min_std, h_critical, x_lim_max_lev, x_lim_min_lev = calculate_wp_plot_limits(leverage_train,std_residual_train, x_std_max=4, x_std_min=-4)
-       
-        figure  = williams_plot(leverage_train, leverage_test, std_residual_train, std_residual_test,id_list_1)
-         
-        col1, col2 = st.columns(2)
+    if run:
+        data = pd.read_csv(uploaded_file_1)
+        data = ensure_unique_cols(data)
 
+        train_data = data_train[loaded_desc]
+        descriptors_total_1, _ = calc_descriptors(data, 1)
+
+        test_data1, id_list_1 = reading_reorder(descriptors_total_1, loaded_desc)
+        X_final2 = test_data1
+
+        df_train_normalized, df_test_normalized = normalize_data(train_data, X_final2)
+
+        final_file, styled_df, leverage_train, std_residual_train, leverage_test, std_residual_test = predictions(
+            loaded_model, loaded_desc, df_test_normalized, df_train_normalized, data, mean_value
+        )
+
+        x_lim_max_std, x_lim_min_std, h_critical, x_lim_max_lev, x_lim_min_lev = calculate_wp_plot_limits(
+            leverage_train, std_residual_train, x_std_max=4, x_std_min=-4
+        )
+
+        figure = williams_plot(
+            leverage_train, leverage_test, std_residual_train, std_residual_test, id_list_1,
+            x_lim_max_std, x_lim_min_std, h_critical, x_lim_max_lev, x_lim_min_lev
+        )
+
+        col1, col2 = st.columns(2)
         with col1:
             st.header("T. pyriformis")
             st.markdown("<hr style='border: 1px solid blue;'>", unsafe_allow_html=True)
-            #st.header("Tetrahymena pyriformis",divider='blue')
-            st.subheader(r'Predictions')
+            st.subheader('Predictions')
             st.write(styled_df)
         with col2:
             st.markdown("<h2 style='text-align: center; font-size: 30px;'>William's Plot (Applicability Domain)</h2>", unsafe_allow_html=True)
-            st.plotly_chart(figure,use_container_width=True)
-        st.markdown(":point_down: **Here you can download the results for T. pyriformis MLR model**", unsafe_allow_html=True,)
+            st.plotly_chart(figure, use_container_width=True)
+
+        st.markdown(":point_down: **Here you can download the results for T. pyriformis MLR model**", unsafe_allow_html=True)
         st.markdown(filedownload1(final_file), unsafe_allow_html=True)
 
-        # Display the top molecule with each SMARTS highlighted in separate images
-        st.title("Molecule with Highlighted Substructures")
-       
-
-# Example file
 else:
     st.info('👈🏼👈🏼👈🏼   Awaiting for CSV file to be uploaded.')
     if st.button('Press to use Example CSV Dataset with smiles'):
         data = pd.read_csv("virtual_smi_example.csv")
-        
+        data = ensure_unique_cols(data)
+
         train_data = data_train[loaded_desc]
-        
-        
-        # Calculate descriptors and SMILES for the first data
-        descriptors_total_1, smiles_list_1 = calc_descriptors(data, 1)
-             
-        #Selecting the descriptors based on model for salt water component
-        test_data1, id_list_1 =  reading_reorder(descriptors_total_1,loaded_desc)
+        descriptors_total_1, _ = calc_descriptors(data, 1)
+        test_data1, id_list_1 = reading_reorder(descriptors_total_1, loaded_desc)
+        X_final2 = test_data1
 
-        X_final2= test_data1
-        
         df_train_normalized, df_test_normalized = normalize_data(train_data, X_final2)
-        
-        final_file, styled_df,leverage_train,std_residual_train, leverage_test, std_residual_test= predictions(loaded_model, loaded_desc, df_test_normalized)
-        
-        x_lim_max_std, x_lim_min_std, h_critical, x_lim_max_lev, x_lim_min_lev = calculate_wp_plot_limits(leverage_train,std_residual_train, x_std_max=4, x_std_min=-4)
-        
-        figure  = williams_plot(leverage_train, leverage_test, std_residual_train, std_residual_test,id_list_1)
-    
-        col1, col2 = st.columns(2)
 
+        final_file, styled_df, leverage_train, std_residual_train, leverage_test, std_residual_test = predictions(
+            loaded_model, loaded_desc, df_test_normalized, df_train_normalized, data, mean_value
+        )
+
+        x_lim_max_std, x_lim_min_std, h_critical, x_lim_max_lev, x_lim_min_lev = calculate_wp_plot_limits(
+            leverage_train, std_residual_train, x_std_max=4, x_std_min=-4
+        )
+
+        figure = williams_plot(
+            leverage_train, leverage_test, std_residual_train, std_residual_test, id_list_1,
+            x_lim_max_std, x_lim_min_std, h_critical, x_lim_max_lev, x_lim_min_lev
+        )
+
+        col1, col2 = st.columns(2)
         with col1:
             st.header("T. pyriformis")
             st.markdown("<hr style='border: 1px solid blue;'>", unsafe_allow_html=True)
-            #st.header("Tetrahymena pyriformis",divider='blue')
-            st.subheader(r'Predictions')
+            st.subheader('Predictions')
             st.write(styled_df)
         with col2:
             st.markdown("<h2 style='text-align: center; font-size: 25px;'>William's Plot (Applicability Domain)</h2>", unsafe_allow_html=True)
-            st.plotly_chart(figure,use_container_width=True)
-        st.markdown(":point_down: **Here you can download the results for T. pyriformis MLR model**", unsafe_allow_html=True,)
+            st.plotly_chart(figure, use_container_width=True)
+
+        st.markdown(":point_down: **Here you can download the results for T. pyriformis MLR model**", unsafe_allow_html=True)
         st.markdown(filedownload1(final_file), unsafe_allow_html=True)
+
+# ===== Optional: Drawn structure block (left as in your app) =====
+# You can re-add your st_ketcher section here as needed, using the same fixes above.
+
 
         # Display the top molecule with each SMARTS highlighted in separate images
         #st.markdown("<h2 style='text-align: center; font-size: 20px;'>Molecule with Highlighted Substructures)</h2>", unsafe_allow_html=True)
@@ -971,3 +867,4 @@ text-align: center;
 </div>
 """
 st.markdown(footer,unsafe_allow_html=True)
+
