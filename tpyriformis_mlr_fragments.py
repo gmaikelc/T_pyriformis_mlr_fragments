@@ -610,7 +610,7 @@ def williams_plot(leverage_train, leverage_test, std_residual_train, std_residua
     if save_plot and filename:
         fig.write_image(filename)
     if show_plot:
-        st.plotly_chart(fig, use_container_width=True)
+        #st.plotly_chart(fig, use_container_width=True)
     return fig
 
 # ============== File download helper ==================
@@ -687,7 +687,7 @@ if uploaded_file_1 is not None:
             st.write(styled_df)
         with col2:
             st.markdown("<h2 style='text-align: center; font-size: 30px;'>William's Plot (Applicability Domain)</h2>", unsafe_allow_html=True)
-            st.plotly_chart(figure, use_container_width=True)
+            st.plotly_chart(figure, use_container_width=True, key= "williams_plot_main")
 
         st.markdown(":point_down: **Here you can download the results for T. pyriformis MLR model**", unsafe_allow_html=True)
         st.markdown(filedownload1(final_file), unsafe_allow_html=True)
@@ -843,5 +843,6 @@ text-align: center;
 </div>
 """
 st.markdown(footer,unsafe_allow_html=True)
+
 
 
