@@ -609,7 +609,7 @@ def williams_plot(leverage_train, leverage_test, std_residual_train, std_residua
 
     if save_plot and filename:
         fig.write_image(filename)
-    if show_plot:
+    #if show_plot:
         #st.plotly_chart(fig, use_container_width=True)
     return fig
 
@@ -843,6 +843,7 @@ text-align: center;
 </div>
 """
 st.markdown(footer,unsafe_allow_html=True)
+
 
 
 
