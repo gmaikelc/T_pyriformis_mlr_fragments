@@ -760,11 +760,20 @@ if uploaded_file_1 is not None:
         data = pd.read_csv(uploaded_file_1)
         data = ensure_unique_cols(data)
 
+        # No fragment/molecule visuals in this branch
+        SHOW_FRAGMENTS = False
+
         train_data = data_train[loaded_desc]
         descriptors_total_1, _ = calc_descriptors(data, 1)
 
         test_data1, id_list_1 = reading_reorder(descriptors_total_1, loaded_desc)
         X_final2 = test_data1
+
+        # --- ensure hover IDs are 1-D strings (prevents narwhals/plotly hiccups)
+        try:
+            id_list_1 = id_list_1.astype(str)   # Series -> str
+        except Exception:
+            pass
 
         df_train_normalized, df_test_normalized = normalize_data(train_data, X_final2)
 
@@ -789,10 +798,11 @@ if uploaded_file_1 is not None:
             st.write(styled_df)
         with col2:
             st.markdown("<h2 style='text-align: center; font-size: 30px;'>William's Plot (Applicability Domain)</h2>", unsafe_allow_html=True)
-            st.plotly_chart(figure, use_container_width=True, key= "williams_plot_main")
+            st.plotly_chart(figure, use_container_width=True, key="williams_plot_main")
 
         st.markdown(":point_down: **Here you can download the results for T. pyriformis MLR model**", unsafe_allow_html=True)
         st.markdown(filedownload1(final_file), unsafe_allow_html=True)
+
 
 else:
     st.info('👈🏼👈🏼👈🏼   Awaiting for CSV file to be uploaded.')
@@ -985,6 +995,7 @@ text-align: center;
 </div>
 """
 st.markdown(footer,unsafe_allow_html=True)
+
 
 
 
