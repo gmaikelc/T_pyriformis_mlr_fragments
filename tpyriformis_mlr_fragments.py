@@ -809,27 +809,33 @@ else:
     if st.button('Press to use Example CSV Dataset with smiles'):
         data = pd.read_csv("virtual_smi_example.csv")
         data = ensure_unique_cols(data)
-
+    
         train_data = data_train[loaded_desc]
         descriptors_total_1, _ = calc_descriptors(data, 1)
         test_data1, id_list_1 = reading_reorder(descriptors_total_1, loaded_desc)
         X_final2 = test_data1
-
+    
+        # ensure hover ids are 1-D strings
+        try:
+            id_list_1 = id_list_1.astype(str)
+        except Exception:
+            pass
+    
         df_train_normalized, df_test_normalized = normalize_data(train_data, X_final2)
-
+    
         final_file, styled_df, leverage_train, std_residual_train, leverage_test, std_residual_test = predictions(
             loaded_model, loaded_desc, df_test_normalized, df_train_normalized, data, mean_value
         )
-
+    
         x_lim_max_std, x_lim_min_std, h_critical, x_lim_max_lev, x_lim_min_lev = calculate_wp_plot_limits(
             leverage_train, std_residual_train, x_std_max=4, x_std_min=-4
         )
-
+    
         figure = williams_plot(
             leverage_train, leverage_test, std_residual_train, std_residual_test, id_list_1,
             x_lim_max_std, x_lim_min_std, h_critical, x_lim_max_lev, x_lim_min_lev
         )
-
+    
         col1, col2 = st.columns(2)
         with col1:
             st.header("T. pyriformis")
@@ -838,10 +844,11 @@ else:
             st.write(styled_df)
         with col2:
             st.markdown("<h2 style='text-align: center; font-size: 25px;'>William's Plot (Applicability Domain)</h2>", unsafe_allow_html=True)
-            st.plotly_chart(figure, use_container_width=True)
-
+            st.plotly_chart(figure, use_container_width=True, key="williams_plot_example")
+    
         st.markdown(":point_down: **Here you can download the results for T. pyriformis MLR model**", unsafe_allow_html=True)
         st.markdown(filedownload1(final_file), unsafe_allow_html=True)
+
 
 # ===== Optional: Drawn structure block (left as in your app) =====
 # You can re-add your st_ketcher section here as needed, using the same fixes above.
@@ -995,6 +1002,7 @@ text-align: center;
 </div>
 """
 st.markdown(footer,unsafe_allow_html=True)
+
 
 
 
