@@ -671,79 +671,58 @@ def _atoms_bonds_from_match(mol: Chem.Mol, match: Tuple[int, ...]):
 
 def make_fragment_grid_for_molecule(
     smiles: str,
-    fragment_effects: Dict[str, Tuple[str, int, float]],
-    per_row: int = 5,
+    fragment_effects: Dict[str, Tuple[str, int, float]],  # label -> (SMARTS, sign, |coef|)
+    per_row: int = 3,
     tile_size=(260, 260),
     highlight_all_occurrences: bool = True,
     sort_by_magnitude: bool = True,
+    show_only_present: bool = True,   # ← NEW
 ):
-    """
-    Repeat the SAME molecule in a grid; each tile highlights ONE fragment
-    with ALL its occurrences (if highlight_all_occurrences=True).
-
-    fragment_effects: {label: (smarts, effect_sign, coef_abs)}
-        effect_sign: +1 -> red (↑tox), -1 -> green (↓tox)
-        coef_abs: |coefficient| used for optional sorting by importance
-    """
+    """Repeat the SAME molecule; one tile per fragment in FRAGMENT_EFFECTS.
+       If show_only_present=True, skip fragments with no matches in the molecule."""
     mol = Chem.MolFromSmiles(smiles)
     if not mol:
         return None
     Chem.rdDepictor.Compute2DCoords(mol)
 
-    # optional: sort tiles by |coef| descending
     items = list(fragment_effects.items())
     if sort_by_magnitude:
-        items.sort(key=lambda kv: kv[1][2], reverse=True)
+        items.sort(key=lambda kv: kv[1][2], reverse=True)  # sort by |coef| desc
 
     mols, legends = [], []
     highlightAtomLists, highlightBondLists = [], []
     highlightAtomColors, highlightBondColors = [], []
 
-    for label, (smarts, eff, mag) in items:
+    for label, (smarts, sign, mag) in items:
         matches = _find_fragment_matches(mol, smarts)
-        color = RED if eff >= 0 else GREEN
-        if not matches:
-            # still display tile so users see "no hit"
+        if not matches and show_only_present:
+            continue  # skip “no hit” tiles entirely
+
+        color = RED if sign >= 0 else GREEN
+
+        if not matches:  # show “no hit” tile only if show_only_present=False
             mols.append(mol)
-            legends.append(f"{label} (no hit)")
-            highlightAtomLists.append([])
-            highlightBondLists.append([])
-            highlightAtomColors.append({})
-            highlightBondColors.append({})
+            legends.append(f"{label} (no hit, |β|={mag:.3g}, {_tox_phrase(sign)})")
+            highlightAtomLists.append([]); highlightBondLists.append([])
+            highlightAtomColors.append({}); highlightBondColors.append({})
             continue
 
-        if highlight_all_occurrences:
-            atoms_all, bonds_all = set(), set()
-            for m in matches:
-                a_idxs, b_idxs = _atoms_bonds_from_match(mol, m)
-                atoms_all.update(a_idxs)
-                bonds_all.update(b_idxs)
-            a_list = list(atoms_all)
-            b_list = list(bonds_all)
-            a_colors = {i: color for i in a_list}
-            b_colors = {i: color for i in b_list}
+        # highlight all occurrences of this fragment
+        atoms_all, bonds_all = set(), set()
+        for m in matches:
+            a_idxs, b_idxs = _atoms_bonds_from_match(mol, m)
+            atoms_all.update(a_idxs); bonds_all.update(b_idxs)
+        a_list = list(atoms_all); b_list = list(bonds_all)
+        a_colors = {i: color for i in a_list}
+        b_colors = {i: color for i in b_list}
 
-            mols.append(mol)
-            legends.append(f"{label} ({_tox_phrase(eff)})")
-            highlightAtomLists.append(a_list)
-            highlightBondLists.append(b_list)
-            highlightAtomColors.append(a_colors)
-            highlightBondColors.append(b_colors)
-        else:
-            # one tile per individual occurrence (can create many tiles)
-            k = 0
-            for m in matches:
-                k += 1
-                a_idxs, b_idxs = _atoms_bonds_from_match(mol, m)
-                a_colors = {i: color for i in a_idxs}
-                b_colors = {i: color for i in b_idxs}
-                mols.append(mol)
-                legends.append(f"{label} ({_tox_phrase(eff)})")
-                #legends.append(f"{label} (hit {k}, |β|={mag:.3g})")
-                highlightAtomLists.append(a_idxs)
-                highlightBondLists.append(b_idxs)
-                highlightAtomColors.append(a_colors)
-                highlightBondColors.append(b_colors)
+        mols.append(mol)
+        legends.append(f"{label} (|β|={mag:.3g}, {_tox_phrase(sign)})")
+        highlightAtomLists.append(a_list); highlightBondLists.append(b_list)
+        highlightAtomColors.append(a_colors); highlightBondColors.append(b_colors)
+
+    if not mols:
+        return None
 
     img = Draw.MolsToGridImage(
         mols,
@@ -757,7 +736,6 @@ def make_fragment_grid_for_molecule(
         highlightBondColors=highlightBondColors,
     )
     return img
-
 
 
 # ============== Load model & descriptors ==============
@@ -1007,6 +985,7 @@ text-align: center;
 </div>
 """
 st.markdown(footer,unsafe_allow_html=True)
+
 
 
 
