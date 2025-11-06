@@ -678,7 +678,7 @@ def _atoms_bonds_from_match(mol: Chem.Mol, match: Tuple[int, ...]):
 def make_fragment_grid_for_molecule(
     smiles: str,
     fragment_effects: Dict[str, Tuple[str, int, float]],  # label -> (SMARTS, sign, |coef|)
-    per_row: int = 3,
+    per_row: int = 5,
     tile_size=(260, 260),
     highlight_all_occurrences: bool = True,
     sort_by_magnitude: bool = True,
@@ -1008,6 +1008,7 @@ text-align: center;
 </div>
 """
 st.markdown(footer,unsafe_allow_html=True)
+
 
 
 
