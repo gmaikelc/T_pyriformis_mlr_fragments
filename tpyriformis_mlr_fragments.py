@@ -64,6 +64,12 @@ from matplotlib.lines import Line2D
 import matplotlib.patches as mpatches
 import time
 
+try:
+    generate_molecule_image  # type: ignore[name-defined]
+except NameError:
+    def generate_molecule_image(*args, **kwargs):
+        return None
+
 
 
 #%% PAGE CONFIG
@@ -1002,6 +1008,7 @@ text-align: center;
 </div>
 """
 st.markdown(footer,unsafe_allow_html=True)
+
 
 
 
