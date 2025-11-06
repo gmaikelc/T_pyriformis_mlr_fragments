@@ -724,7 +724,7 @@ def make_fragment_grid_for_molecule(
             b_colors = {i: color for i in b_list}
 
             mols.append(mol)
-            legends.append(f"{label} (tox {mag})")
+            legends.append(f"{label} ({_tox_phrase(eff)})")
             highlightAtomLists.append(a_list)
             highlightBondLists.append(b_list)
             highlightAtomColors.append(a_colors)
@@ -1007,5 +1007,6 @@ text-align: center;
 </div>
 """
 st.markdown(footer,unsafe_allow_html=True)
+
 
 
