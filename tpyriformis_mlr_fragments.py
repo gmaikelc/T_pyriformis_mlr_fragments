@@ -708,7 +708,7 @@ def make_fragment_grid_for_molecule(
 
         if not matches:  # show “no hit” tile only if show_only_present=False
             mols.append(mol)
-            legends.append(f"{label} (no hit, |β|={mag:.3g}, {_tox_phrase(sign)})")
+            legends.append(f"{label} (no hit, {_tox_phrase(sign)})")
             highlightAtomLists.append([]); highlightBondLists.append([])
             highlightAtomColors.append({}); highlightBondColors.append({})
             continue
@@ -723,7 +723,7 @@ def make_fragment_grid_for_molecule(
         b_colors = {i: color for i in b_list}
 
         mols.append(mol)
-        legends.append(f"{label} (|β|={mag:.3g}, {_tox_phrase(sign)})")
+        legends.append(f"{label} (, {_tox_phrase(sign)})")
         highlightAtomLists.append(a_list); highlightBondLists.append(b_list)
         highlightAtomColors.append(a_colors); highlightBondColors.append(b_colors)
 
@@ -1008,6 +1008,7 @@ text-align: center;
 </div>
 """
 st.markdown(footer,unsafe_allow_html=True)
+
 
 
 
